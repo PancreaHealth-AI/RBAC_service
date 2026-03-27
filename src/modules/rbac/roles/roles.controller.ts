@@ -1,57 +1,89 @@
 import {
   Controller,
-  Get,
   Post,
+  Body,
+  UseGuards,
+  UnauthorizedException,
+  Req,
+  Get,
+  Query,
+  Param,
+  ParseUUIDPipe,
   Put,
   Delete,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-  Request,
-  HttpCode,
   HttpStatus,
-  ParseUUIDPipe,
-  UnauthorizedException,
+  HttpCode,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import type { Request } from 'express'; // ✅ CORRECT
+
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
-import { UpdateRoleDto } from './dto/update-role.dto';
+import { JwtGatewayGuard } from '../../../common/guards/jwt-gateway.guard';
 import { QueryRolesDto } from './dto/query-roles.dto';
 import { RoleResponseDto } from './dto/role-response.dto';
-// import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-// import { RolesGuard } from '../../common/guards/roles.guard';
-// import { Roles } from '../../common/decorators/roles.decorator';
+import { UpdateRoleDto } from './dto/update-role.dto';
 
 @ApiTags('RBAC - Roles')
 @Controller('rbac/roles')
-// @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
+@UseGuards(JwtGatewayGuard) // ✅ IMPORTANT
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 
-  /**
-   * Créer un nouveau rôle
-   */
   @Post()
-//   @Roles('ADMIN', 'SUPER_ADMIN')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Créer un nouveau rôle' })
-  @ApiResponse({ status: 201, description: 'Rôle créé', type: RoleResponseDto })
-  @ApiResponse({ status: 409, description: 'Code de rôle déjà utilisé' })
-@Post()
-async create(@Body() createRoleDto: CreateRoleDto, @Request() req: Request) {
-  console.log("req headers:", req.headers);
-  const userId = req.headers['x-user-id']; // ← correction ici
-  console.log("User ID from headers:", userId);
+  async create(
+    @Body() createRoleDto: CreateRoleDto,
+    @Req() req: Request,
+  ) {
+    // ✅ sécuriser
+    if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
 
-  if (!userId) {
-    throw new UnauthorizedException('User not identified');
+    const userId = req.user.id; // ✅ maintenant safe
+
+    return this.rolesService.create(createRoleDto, userId);
   }
+  // @Post()
+  // async create(@Body() createRoleDto: CreateRoleDto, @Req() req: Request) {
+  //   const userIdHeader = req.headers['x-user-id'];
+  //   const userId = Array.isArray(userIdHeader) ? userIdHeader[0] : userIdHeader;
+  //       console.log("userId 1:" , userId)
 
-  return this.rolesService.create(createRoleDto, userId);
-}
+  //   if (!userId) {
+  //     throw new UnauthorizedException('User not identified');
+  //   }
+  //   // Si besoin, vous pouvez aussi lire :
+  //   // const email = req.headers['x-user-email'];
+  //   // const roles = req.headers['x-user-roles'] ? JSON.parse(req.headers['x-user-roles']) : [];
+  //   console.log("userId:" , userId)
+  //   return this.rolesService.create(createRoleDto, userId);
+  // }
+  // @Post()
+  // async create(@Body() createRoleDto: CreateRoleDto, @Req() req: Request) {
+  //   console.log("user:" , req.user!.id)
+  //   if (!req.user) {
+  //     throw new UnauthorizedException('User not found');
+  //   }
+  //   const userId = req.user.id; 
+  //   const userEmail = req.user.email;
+  //   const userRoles = req.user.roles;
+  //   // ...
+  //   return this.rolesService.create(createRoleDto, userId);
+  // }
+// @Post()
+// async create(@Body() createRoleDto: CreateRoleDto, @Request() req: Request) {
+//   console.log("req headers:", req.headers);
+//   const userId = req.headers['x-user-id']; // ← correction ici
+//   console.log("User ID from headers:", userId);
+
+//   if (!userId) {
+//     throw new UnauthorizedException('User not identified');
+//   }
+
+//   return this.rolesService.create(createRoleDto, userId);
+// }
 
   /**
    * Lister tous les rôles

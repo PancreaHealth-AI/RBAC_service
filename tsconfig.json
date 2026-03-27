@@ -21,6 +21,8 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
+    // dans le cas ou on a fait avec x_user
+    // "typeRoots": ["./node_modules/@types", "./src/types"],
     "paths": {
       "@database/*": ["database/*"]
     }

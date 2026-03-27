@@ -70,8 +70,8 @@ export class RolesService {
 
     const queryBuilder = this.roleRepository
       .createQueryBuilder('role')
-      .leftJoinAndSelect('role.rolePermissions', 'rolePermission')
-      .leftJoinAndSelect('rolePermission.permission', 'permission');
+      // .leftJoinAndSelect('role.rolePermissions', 'rolePermission')
+      //  .leftJoinAndSelect('rolePermission.permission', 'permission');
 
     // Filtres
     if (search) {

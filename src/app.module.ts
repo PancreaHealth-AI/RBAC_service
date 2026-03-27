@@ -5,6 +5,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { getDatabaseConfig } from './config/database.config';
 import { getRedisConfig } from 'config/redis.config';
 import { RedisModule } from '@nestjs-modules/ioredis';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtGatewayGuard } from 'common/guards/jwt-gateway.guard';
+
 
 
 @Module({
@@ -33,6 +36,11 @@ import { RedisModule } from '@nestjs-modules/ioredis';
     
     RolesModule],
   controllers: [],
-  providers: [],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: JwtGatewayGuard,
+    },
+  ]
 })
 export class AppModule {}
