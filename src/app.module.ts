@@ -7,6 +7,7 @@ import { getRedisConfig } from 'config/redis.config';
 import { RedisModule } from '@nestjs-modules/ioredis';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtGatewayGuard } from 'common/guards/jwt-gateway.guard';
+import { PermissionsModule } from 'modules/rbac/permissions/permissions.module';
 
 
 
@@ -34,7 +35,8 @@ import { JwtGatewayGuard } from 'common/guards/jwt-gateway.guard';
     }),
     
     
-    RolesModule],
+    RolesModule,
+    PermissionsModule],
   controllers: [],
   providers: [
     {
