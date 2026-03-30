@@ -9,6 +9,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtGatewayGuard } from 'common/guards/jwt-gateway.guard';
 import { PermissionsModule } from 'modules/rbac/permissions/permissions.module';
 import { AssignmentsModule } from 'modules/rbac/assignments/assignments.module';
+import { PermissionOverridesModule } from 'modules/rbac/permission-overrides/permission-overrides.module';
 
 
 
@@ -39,6 +40,7 @@ import { AssignmentsModule } from 'modules/rbac/assignments/assignments.module';
     RolesModule,
     PermissionsModule,
     AssignmentsModule,
+    PermissionOverridesModule,
   ],
   controllers: [],
   providers: [
