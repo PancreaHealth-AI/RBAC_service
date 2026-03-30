@@ -8,6 +8,7 @@ import { RedisModule } from '@nestjs-modules/ioredis';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtGatewayGuard } from 'common/guards/jwt-gateway.guard';
 import { PermissionsModule } from 'modules/rbac/permissions/permissions.module';
+import { PermissionOverridesModule } from 'modules/rbac/permission-overrides/permission-overrides.module';
 
 
 
@@ -36,7 +37,9 @@ import { PermissionsModule } from 'modules/rbac/permissions/permissions.module';
     
     
     RolesModule,
-    PermissionsModule],
+    PermissionsModule,
+    PermissionOverridesModule,
+  ],
   controllers: [],
   providers: [
     {
