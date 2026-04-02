@@ -111,7 +111,7 @@ export class AssignmentsService {
   async getEffectivePermissions(userId: string) {
     // Récupérer tous les rôles actifs de l'utilisateur
     const assignments = await this.getUserAssignments(userId);
-
+    // console.log('Assignments for user', userId, assignments);
     if (assignments.length === 0) {
       return {
         userId,
@@ -140,10 +140,10 @@ export class AssignmentsService {
       },
       relations: ['permission'],
     });
-
+    console.log('Overrides for user', userId, overrides);
     // Filtrer les surcharges expirées
-    const activeOverrides = overrides.filter((o) => o.isActive);
-
+    // const activeOverrides = overrides.filter((o) => o.isActive);
+    // console.log('Active Overrides for user', userId, activeOverrides);
     // Construire le set de permissions effectives
     const permissionsMap = new Map<string, any>();
 
@@ -166,7 +166,7 @@ export class AssignmentsService {
     });
 
     // Appliquer les surcharges
-    activeOverrides.forEach((override) => {
+    overrides.forEach((override) => {
       const permCode = override.permission.code;
 
       if (override.overrideType === OverrideType.GRANT) {

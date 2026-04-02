@@ -12,6 +12,7 @@ import { RolePermission } from '@database/entities/role-permission.entity';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { QueryRolesDto } from './dto/query-roles.dto';
+import { console } from 'inspector';
 
 @Injectable()
 export class RolesService {
@@ -28,13 +29,18 @@ export class RolesService {
    * Créer un nouveau rôle
    */
   async create(createRoleDto: CreateRoleDto, createdBy: string) {
-    // Vérifier si le code existe déjà
+    console.log("createBy:", createdBy)
+    // Vérifier si le code ou le nom existe déjà
     const existingRole = await this.roleRepository.findOne({
-      where: { code: createRoleDto.code },
+      where: [
+        { code: createRoleDto.code, deletedAt: IsNull() },
+        { name: createRoleDto.name, deletedAt: IsNull() },
+      ],
     });
-    console.log("existingRole :",existingRole)
+    console.log("existingRole:", existingRole)
     if (existingRole) {
-      throw new ConflictException('Un rôle avec ce code existe déjà');
+      const conflictField = existingRole.code === createRoleDto.code ? 'code' : 'nom';
+      throw new ConflictException(`Un rôle avec ce ${conflictField} existe déjà`);
     }
 
     // Créer le rôle
@@ -70,8 +76,8 @@ export class RolesService {
 
     const queryBuilder = this.roleRepository
       .createQueryBuilder('role')
-      // .leftJoinAndSelect('role.rolePermissions', 'rolePermission')
-      //  .leftJoinAndSelect('rolePermission.permission', 'permission');
+      .leftJoinAndSelect('role.rolePermissions', 'rolePermission')
+      .leftJoinAndSelect('rolePermission.permission', 'permission');
 
     // Filtres
     if (search) {
@@ -360,5 +366,66 @@ export class RolesService {
     await this.rolePermissionRepository.save(newPermissions);
 
     return this.findOne(savedNewRole.id);
+  }
+
+  /**
+   * Ajouter plusieurs permissions à un rôle
+   */
+  async addPermissions(
+    roleId: string,
+    permissionIds: string[],
+    constraints?: Record<string, any>,
+  ) {
+    const role = await this.findOne(roleId);
+
+    // Vérifier que toutes les permissions existent
+    const permissions = await this.permissionRepository.findByIds(permissionIds);
+    if (permissions.length !== permissionIds.length) {
+      throw new NotFoundException('Une ou plusieurs permissions sont introuvables');
+    }
+
+    // Pour chaque permission, créer ou mettre à jour l'association
+    const results: Array<{ permissionId: string; status: string }> = [];
+    for (const permissionId of permissionIds) {
+      const existing = await this.rolePermissionRepository.findOne({
+        where: { roleId, permissionId },
+      });
+      if (existing) {
+        existing.isGranted = true;
+        if (constraints) existing.constraints = constraints;
+        await this.rolePermissionRepository.save(existing);
+        results.push({ permissionId, status: 'updated' });
+      } else {
+        const newRolePerm = this.rolePermissionRepository.create({
+          roleId,
+          permissionId,
+          isGranted: true,
+          constraints,
+        });
+        await this.rolePermissionRepository.save(newRolePerm);
+        results.push({ permissionId, status: 'added' });
+      }
+    }
+
+    return { message: `${results.length} permission(s) ajoutée(s)`, results };
+  }
+
+  /**
+   * Retirer plusieurs permissions d'un rôle
+   */
+  async removePermissions(roleId: string, permissionIds: string[]) {
+    const role = await this.findOne(roleId);
+
+    const result = await this.rolePermissionRepository
+      .createQueryBuilder()
+      .delete()
+      .where('roleId = :roleId AND permissionId IN (:...permissionIds)', { roleId, permissionIds })
+      .execute();
+
+    if (result.affected === 0) {
+      throw new NotFoundException('Aucune permission trouvée pour ce rôle');
+    }
+
+    return { message: `${result.affected} permission(s) retirée(s)` };
   }
 }

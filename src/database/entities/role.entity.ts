@@ -7,6 +7,7 @@ import {
   Index,
   OneToMany,
 } from 'typeorm';
+import { RolePermission } from './role-permission.entity';
 
 export enum RoleType {
   SYSTEM = 'SYSTEM',
@@ -73,4 +74,6 @@ export class Role {
   deletedAt: Date;
 
   // Relations seront définies dans les modules respectifs
+  @OneToMany(() => RolePermission, (rolePermission) => rolePermission.role)
+  rolePermissions: RolePermission[];
 }

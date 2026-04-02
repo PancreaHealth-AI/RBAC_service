@@ -14,8 +14,8 @@ import {
   HttpStatus,
   HttpCode,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
-import type { Request } from 'express'; // ✅ CORRECT
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
+import type { Request } from 'express'; 
 
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
@@ -23,11 +23,13 @@ import { JwtGatewayGuard } from '../../../common/guards/jwt-gateway.guard';
 import { QueryRolesDto } from './dto/query-roles.dto';
 import { RoleResponseDto } from './dto/role-response.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { AddPermissionsDto } from './dto/add-permissions.dto';
+import { RemovePermissionsDto } from './dto/remove-permissions.dto';
 
 @ApiTags('RBAC - Roles')
 @Controller('rbac/roles')
 @ApiBearerAuth()
-@UseGuards(JwtGatewayGuard) // ✅ IMPORTANT
+// @UseGuards(JwtGatewayGuard) // ✅ IMPORTANT
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 
@@ -36,13 +38,12 @@ export class RolesController {
     @Body() createRoleDto: CreateRoleDto,
     @Req() req: Request,
   ) {
-    // ✅ sécuriser
+    
     if (!req.user) {
       throw new UnauthorizedException('User not found');
     }
 
-    const userId = req.user.id; // ✅ maintenant safe
-
+    const userId = req.user.sub; 
     return this.rolesService.create(createRoleDto, userId);
   }
   // @Post()
@@ -171,5 +172,76 @@ export class RolesController {
     @Param('permissionId', ParseUUIDPipe) permissionId: string,
   ) {
     return this.rolesService.removePermission(id, permissionId);
+  }
+
+  /**
+   * Ajouter plusieurs permissions à un rôle
+   */
+  @Post(':id/permissions')
+  @ApiOperation({ summary: 'Ajouter plusieurs permissions à un rôle' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiBody({ type: AddPermissionsDto })
+  @ApiResponse({ status: 200, description: 'Permissions ajoutées' })
+  async addPermissions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() addPermissionsDto: AddPermissionsDto,
+  ) {
+    return this.rolesService.addPermissions(
+      id,
+      addPermissionsDto.permissionIds,
+      addPermissionsDto.constraints,
+    );
+  }
+
+  /**
+   * Retirer plusieurs permissions d'un rôle
+   */
+  @Delete(':id/permissions')
+  @ApiOperation({ summary: 'Retirer plusieurs permissions d\'un rôle' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiBody({ type: RemovePermissionsDto })
+  @ApiResponse({ status: 200, description: 'Permissions retirées' })
+  async removePermissions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() removePermissionsDto: RemovePermissionsDto,
+  ) {
+    return this.rolesService.removePermissions(id, removePermissionsDto.permissionIds);
+  }
+
+  /**
+   * Cloner un rôle
+   */
+  @Post(':id/clone')
+  @ApiOperation({ summary: 'Cloner un rôle existant vers un nouveau rôle' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        newName: { type: 'string', example: 'Admin Service' },
+        newCode: { type: 'string', example: 'ADMIN_SERVICE' },
+        newScopeType: { type: 'string', enum: ['GLOBAL', 'HOSPITAL', 'DEPARTMENT', 'SERVICE'], example: 'SERVICE' },
+        newScopeId: { type: 'string', format: 'uuid', nullable: true, example: 'abc-123' }
+      },
+      required: ['newName', 'newCode', 'newScopeType']
+    }
+  })
+  @ApiResponse({ status: 201, description: 'Rôle cloné avec succès', type: RoleResponseDto })
+  async cloneRole(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() cloneDto: {
+      newName: string;
+      newCode: string;
+      newScopeType: string;
+      newScopeId?: string;
+    },
+  ) {
+    return this.rolesService.cloneRole(
+      id,
+      cloneDto.newName,
+      cloneDto.newCode,
+      cloneDto.newScopeType,
+      cloneDto.newScopeId,
+    );
   }
 }

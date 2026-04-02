@@ -29,7 +29,7 @@ export class CreatePermissionOverrideDto {
   @IsOptional()
   reason?: string;
 
-  @ApiPropertyOptional({ example: '2024-12-31T23:59:59Z', description: 'Date d\'expiration' })
+  @ApiPropertyOptional({ example: '2026-12-31T23:59:59Z', description: 'Date d\'expiration' })
   @IsDateString()
   @IsOptional()
   expiresAt?: string;

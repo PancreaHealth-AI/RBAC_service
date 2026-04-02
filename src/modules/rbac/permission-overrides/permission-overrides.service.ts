@@ -71,7 +71,7 @@ export class PermissionOverridesService {
       overrideType,
       reason,
       approvedBy,
-      expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+      expiresAt: expiresAt ? new Date(expiresAt) : null as any,
     });
 
     const savedOverride = await this.overrideRepository.save(override);
@@ -149,11 +149,17 @@ export class PermissionOverridesService {
     queryBuilder.skip(skip).take(limit);
 
     const [overrides, total] = await queryBuilder.getManyAndCount();
-
+    console.log(queryBuilder.getSql());
+    console.log('Nb role_assignments pour userId:', await this.roleAssignmentRepository.count({ where: { userId } }));
+console.log('Nb overrides pour ce userId:', await this.overrideRepository.count({
+  where: {
+    roleAssignment: { userId }
+  }
+}));
+    console.log('userId', userId, 'roleAssignmentId', roleAssignmentId, 'permissionId', permissionId, 'overrideType', overrideType, 'activeOnly', activeOnly, 'startDate', startDate, 'endDate', endDate);
     // Enrichir les résultats
     const enrichedOverrides = overrides.map((override) => ({
       ...override,
-      isActive: override.isActive,
       permission: {
         id: override.permission.id,
         code: override.permission.code,
@@ -195,7 +201,6 @@ export class PermissionOverridesService {
 
     return {
       ...override,
-      isActive: override.isActive,
       permission: {
         id: override.permission.id,
         code: override.permission.code,
@@ -224,6 +229,8 @@ export class PermissionOverridesService {
 
     if (updateOverrideDto.expiresAt) {
       override.expiresAt = new Date(updateOverrideDto.expiresAt);
+    }else if (updateOverrideDto.expiresAt === null) {
+      override.expiresAt = null as any; // Permet de retirer la date d'expiration
     }
 
     if (updateOverrideDto.reason !== undefined) {
@@ -305,7 +312,6 @@ export class PermissionOverridesService {
       reason: override.reason,
       expiresAt: override.expiresAt,
       createdAt: override.createdAt,
-      isActive: override.isActive,
     }));
   }
 
@@ -326,7 +332,6 @@ export class PermissionOverridesService {
       overrideType: override.overrideType,
       reason: override.reason,
       expiresAt: override.expiresAt,
-      isActive: override.isActive,
     }));
   }
 
