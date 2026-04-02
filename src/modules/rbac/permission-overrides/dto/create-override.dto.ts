@@ -3,11 +3,6 @@ import { IsUUID, IsNotEmpty, IsEnum, IsString, IsOptional, IsDateString } from '
 import { OverrideType } from '@database/entities/permission-override.entity';
 
 export class CreatePermissionOverrideDto {
-  
-  @ApiProperty({ example: 'user-uuid', description: 'ID de l\'utilisateur' })
-  @IsUUID()
-  @IsNotEmpty()
-  userId: string;
 
   @ApiProperty({ example: 'role-assignment-uuid', description: 'ID de l\'attribution de rôle' })
   @IsUUID()
@@ -29,8 +24,8 @@ export class CreatePermissionOverrideDto {
   @IsOptional()
   reason?: string;
 
-  @ApiPropertyOptional({ example: '2026-12-31T23:59:59Z', description: 'Date d\'expiration' })
+  @ApiPropertyOptional({ example: '2026-12-31T23:59:59Z', description: 'Date d\'expiration' , format: 'date-time' , nullable: true })
   @IsDateString()
   @IsOptional()
-  expiresAt?: string;
+  expiresAt?: string | null;
 }

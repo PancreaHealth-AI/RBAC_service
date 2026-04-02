@@ -147,11 +147,24 @@ export class PermissionOverridesController {
   @ApiResponse({ status: 200, description: 'Surcharges de l\'utilisateur' })
   async getUserOverrides(
     @Param('userId', ParseUUIDPipe) userId: string,
-    @Query('activeOnly') activeOnly?: boolean,
   ) {
     return this.permissionOverridesService.getUserOverrides(
       userId,
-      activeOnly !== false,
+    );
+  }
+  /**
+   *    * Récupérer toutes les surcharges d'une affectation de rôle
+   */
+  @Get('assignment/:assignmentId')
+  // @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Récupérer toutes les surcharges d\'une affectation de rôle' })
+  @ApiParam({ name: 'assignmentId', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Surcharges de l\'affectation de rôle' })
+  async getAssignmentOverrides(
+    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
+  ) {
+    return this.permissionOverridesService.getAssignmentOverrides(
+      assignmentId,
     );
   }
 

@@ -28,12 +28,12 @@ export class PermissionOverridesService {
    * Créer une surcharge de permission
    */
   async create(createOverrideDto: CreatePermissionOverrideDto, approvedBy: string) {
-    const { userId, roleAssignmentId, permissionId, overrideType, reason, expiresAt } =
+    const {  roleAssignmentId, permissionId, overrideType, reason, expiresAt } =
       createOverrideDto;
 
     // Vérifier que le role assignment existe
     const roleAssignment = await this.roleAssignmentRepository.findOne({
-      where: { id: roleAssignmentId, userId },
+      where: { id: roleAssignmentId },
       relations: ['role'],
     });
 
@@ -90,13 +90,12 @@ export class PermissionOverridesService {
       roleAssignmentId,
       permissionId,
       overrideType,
-      activeOnly = true,
       startDate,
       endDate,
       sortBy = 'createdAt',
       sortOrder = 'DESC',
     } = queryDto;
-
+    
     const queryBuilder = this.overrideRepository
       .createQueryBuilder('override')
       .leftJoinAndSelect('override.permission', 'permission')
@@ -126,14 +125,6 @@ export class PermissionOverridesService {
       });
     }
 
-    // Filtrer seulement les actives (non expirées)
-    if (activeOnly) {
-      queryBuilder.andWhere(
-        '(override.expiresAt IS NULL OR override.expiresAt > :now)',
-        { now: new Date() },
-      );
-    }
-
     if (startDate && endDate) {
       queryBuilder.andWhere('override.createdAt BETWEEN :startDate AND :endDate', {
         startDate: new Date(startDate),
@@ -149,14 +140,6 @@ export class PermissionOverridesService {
     queryBuilder.skip(skip).take(limit);
 
     const [overrides, total] = await queryBuilder.getManyAndCount();
-    console.log(queryBuilder.getSql());
-    console.log('Nb role_assignments pour userId:', await this.roleAssignmentRepository.count({ where: { userId } }));
-console.log('Nb overrides pour ce userId:', await this.overrideRepository.count({
-  where: {
-    roleAssignment: { userId }
-  }
-}));
-    console.log('userId', userId, 'roleAssignmentId', roleAssignmentId, 'permissionId', permissionId, 'overrideType', overrideType, 'activeOnly', activeOnly, 'startDate', startDate, 'endDate', endDate);
     // Enrichir les résultats
     const enrichedOverrides = overrides.map((override) => ({
       ...override,
@@ -285,19 +268,41 @@ console.log('Nb overrides pour ce userId:', await this.overrideRepository.count(
   /**
    * Récupérer toutes les surcharges d'un utilisateur
    */
-  async getUserOverrides(userId: string, activeOnly: boolean = true) {
+  async getUserOverrides(userId: string) {
     const queryBuilder = this.overrideRepository
       .createQueryBuilder('override')
       .leftJoinAndSelect('override.permission', 'permission')
       .leftJoinAndSelect('override.roleAssignment', 'roleAssignment')
       .where('roleAssignment.userId = :userId', { userId });
 
-    if (activeOnly) {
-      queryBuilder.andWhere(
-        '(override.expiresAt IS NULL OR override.expiresAt > :now)',
-        { now: new Date() },
-      );
-    }
+
+
+    const overrides = await queryBuilder.getMany();
+
+    return overrides.map((override) => ({
+      id: override.id,
+      permission: {
+        id: override.permission.id,
+        code: override.permission.code,
+        name: override.permission.name,
+      },
+      overrideType: override.overrideType,
+      reason: override.reason,
+      expiresAt: override.expiresAt,
+      createdAt: override.createdAt,
+    }));
+  }
+
+  /**
+   * Récupérer toutes les surcharges d'un utilisateur
+   */
+  async getAssignmentOverrides(assignmentId: string) {
+    const queryBuilder = this.overrideRepository
+      .createQueryBuilder('override')
+      .leftJoinAndSelect('override.permission', 'permission')
+      .leftJoinAndSelect('override.roleAssignment', 'roleAssignment')
+      .where('roleAssignment.id = :assignmentId', { assignmentId });
+
 
     const overrides = await queryBuilder.getMany();
 

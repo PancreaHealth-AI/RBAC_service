@@ -24,7 +24,7 @@ export class PermissionsService {
   /**
    * Créer une nouvelle permission
    */
-  async create(createPermissionDto: CreatePermissionDto) {
+  async create(createPermissionDto: CreatePermissionDto , createBy: string) {
     // Vérifier si le code existe déjà
     const existingPermission = await this.permissionRepository.findOne({
       where: { code: createPermissionDto.code },
@@ -35,7 +35,8 @@ export class PermissionsService {
     }
 
     const permission = this.permissionRepository.create(createPermissionDto);
-    return this.permissionRepository.save(permission);
+    permission.createdBy = createBy;
+    return this.permissionRepository.save(permission );
   }
 
   /**
@@ -166,8 +167,8 @@ export class PermissionsService {
         `Cette permission ne peut pas être supprimée car elle est utilisée par ${rolesCount} rôle(s)`,
       );
     }
-
-    await this.permissionRepository.remove(permission);
+    permission.deletedAt = new Date();
+    await this.permissionRepository.save(permission);
 
     return { message: 'Permission supprimée avec succès' };
   }
@@ -787,7 +788,7 @@ export class PermissionsService {
   }
 
   /**
-   * Récupérer toutes les permissions d'un rôle
+   * Récupérer toutes les permissions d'un rôle, catégorisées par resourceType
    */
   async getPermissionsByRole(roleId: string) {
     const rolePermissions = await this.rolePermissionRepository.find({
@@ -795,10 +796,26 @@ export class PermissionsService {
       relations: ['permission'],
     });
 
-    return rolePermissions.map((rp) => ({
-      ...rp.permission,
-      isGranted: rp.isGranted,
-      constraints: rp.constraints,
+    // Regrouper par resourceType
+    const grouped = rolePermissions.reduce((acc, rp) => {
+      const resource = rp.permission.resourceType;
+      if (!acc[resource]) {
+        acc[resource] = [];
+      }
+      acc[resource].push({
+        ...rp.permission,
+        isGranted: rp.isGranted,
+        constraints: rp.constraints,
+      });
+      return acc;
+    }, {} as Record<string, any[]>);
+
+    // Transformer en tableau pour un meilleur affichage (optionnel)
+    const result = Object.entries(grouped).map(([resourceType, permissions]) => ({
+      resourceType,
+      permissions,
     }));
+
+    return result;
   }
 }

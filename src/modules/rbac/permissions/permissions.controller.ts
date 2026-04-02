@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { PermissionsService } from './permissions.service';
@@ -43,8 +44,9 @@ export class PermissionsController {
     type: PermissionResponseDto,
   })
   @ApiResponse({ status: 409, description: 'Code de permission déjà utilisé' })
-  async create(@Body() createPermissionDto: CreatePermissionDto) {
-    return this.permissionsService.create(createPermissionDto);
+  async create(@Req() req: any, @Body() createPermissionDto: CreatePermissionDto) {
+    const createBy = req.user.sub; // Récupérer l'ID de l'utilisateur à partir du token JWT
+    return this.permissionsService.create(createPermissionDto, createBy);
   }
 
   /**

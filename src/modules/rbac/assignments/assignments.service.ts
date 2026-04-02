@@ -15,6 +15,7 @@ import { AssignRoleDto } from './dto/assign-role.dto';
 import { CheckPermissionDto } from './dto/check-permission.dto';
 import { CreatePermissionOverrideDto } from './dto/permission-override.dto';
 import { GrantTemporaryPermissionDto } from './dto/temporary-permission.dto';
+import { UpdateRoleAssignmentDto } from './dto/update-role-assignment.dto';
 
 @Injectable()
 export class AssignmentsService {
@@ -74,20 +75,51 @@ export class AssignmentsService {
     return this.roleAssignmentRepository.save(assignment);
   }
 
-  /**
-   * Retirer un rôle d'un utilisateur
-   */
-  async removeRole(userId: string, roleId: string) {
+ /**
+ * Retirer un rôle d'un utilisateur (suppression physique)
+ */
+  async removeRole(assignmentId: string) {
     const assignment = await this.roleAssignmentRepository.findOne({
-      where: { userId, roleId, isActive: true },
+      where: { id: assignmentId },
     });
 
     if (!assignment) {
       throw new NotFoundException('Attribution de rôle non trouvée');
     }
 
-    assignment.isActive = false;
-    return this.roleAssignmentRepository.save(assignment);
+    await this.roleAssignmentRepository.delete({ id: assignment.id });
+    return { message: 'Attribution de rôle supprimée avec succès' };
+  }
+  /**
+   * Mettre à jour une attribution de rôle
+   */
+  async updateAssignment(
+    assignmentId: string,
+    updateDto: UpdateRoleAssignmentDto,
+  ) {
+    const assignment = await this.roleAssignmentRepository.findOne({
+      where: { id: assignmentId },
+    });
+
+    if (!assignment) {
+      throw new NotFoundException('Attribution de rôle non trouvée');
+    }
+
+    if (updateDto.expiresAt !== undefined) {
+      assignment.expiresAt = updateDto.expiresAt ? new Date(updateDto.expiresAt) : (null as any);
+    }
+    if (updateDto.isActive !== undefined) {
+      assignment.isActive = updateDto.isActive;
+    }
+    if (updateDto.scopeType !== undefined) {
+      assignment.scopeType = updateDto.scopeType;
+    }
+    if (updateDto.scopeId !== undefined) {
+      assignment.scopeId = updateDto.scopeId;
+    }
+
+    await this.roleAssignmentRepository.save(assignment);
+    return assignment;
   }
 
   /**

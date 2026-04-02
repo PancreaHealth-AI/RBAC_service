@@ -18,13 +18,15 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiBody,
 } from '@nestjs/swagger';
 import { AssignmentsService } from './assignments.service';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { CheckPermissionDto } from './dto/check-permission.dto';
 import { CreatePermissionOverrideDto } from './dto/permission-override.dto';
 import { GrantTemporaryPermissionDto } from './dto/temporary-permission.dto';
-import { EffectivePermissionsResponseDto } from './dto/ffective-permissions-response.dto';
+import { EffectivePermissionsResponseDto } from './dto/effective-permissions-response.dto';
+import { UpdateRoleAssignmentDto } from './dto/update-role-assignment.dto';
 // import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 // import { RolesGuard } from '../../common/guards/roles.guard';
 // import { Roles } from '../../common/decorators/roles.decorator';
@@ -56,18 +58,26 @@ export class AssignmentsController {
   /**
    * Retirer un rôle d'un utilisateur
    */
-  @Delete('users/:userId/roles/:roleId')
-  // @Roles('ADMIN', 'SUPER_ADMIN')
-  @HttpCode(HttpStatus.OK)
+  @Delete('users/:assignmentId/roles')
   @ApiOperation({ summary: 'Retirer un rôle d\'un utilisateur' })
-  @ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
-  @ApiParam({ name: 'roleId', type: 'string', format: 'uuid' })
+  @ApiParam({ name: 'assignmentId', type: 'string', format: 'uuid', description: 'ID de l\'attribution de rôle' })
   @ApiResponse({ status: 200, description: 'Rôle retiré' })
-  async removeRole(
-    @Param('userId', ParseUUIDPipe) userId: string,
-    @Param('roleId', ParseUUIDPipe) roleId: string,
+  async removeRole(@Param('assignmentId', ParseUUIDPipe) assignmentId: string) {
+    return this.assignmentsService.removeRole(assignmentId);
+  }
+
+  /**
+   * update une attribution de rôle (expiration, active, scope)
+   */
+  @Patch('users/:assignmentId/roles')
+  @ApiOperation({ summary: 'Mettre à jour une attribution de rôle (expiration, active, scope)' })
+  @ApiParam({ name: 'assignmentId', type: String })
+  @ApiBody({ type: UpdateRoleAssignmentDto })
+  async updateAssignment(
+    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
+    @Body() updateDto: UpdateRoleAssignmentDto,
   ) {
-    return this.assignmentsService.removeRole(userId, roleId);
+    return this.assignmentsService.updateAssignment(assignmentId, updateDto);
   }
 
   /**

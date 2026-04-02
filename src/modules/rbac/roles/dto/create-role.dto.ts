@@ -41,7 +41,7 @@ export class CreateRoleDto {
   @IsNotEmpty()
   scopeType: ScopeType;
 
-  @ApiPropertyOptional({ example: 'a43a1163-2e7e-4dda-bd0c-df3b82325cd0' })
+  @ApiPropertyOptional({ example: 'scope-uuid' })
   @IsUUID()
   @IsOptional()
   scopeId?: string;

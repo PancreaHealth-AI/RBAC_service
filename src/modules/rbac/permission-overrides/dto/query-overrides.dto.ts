@@ -8,7 +8,7 @@ import {
   IsBoolean,
   IsDateString,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { OverrideType } from '@database/entities/permission-override.entity';
 
 export class QueryOverridesDto {
@@ -46,12 +46,7 @@ export class QueryOverridesDto {
   @IsOptional()
   overrideType?: OverrideType;
 
-  @ApiPropertyOptional({ example: true, description: 'Seulement les actives (non expirées)' })
-  @IsBoolean()
-  @Type(() => Boolean)
-  @IsOptional()
-  activeOnly?: boolean = true;
-
+  
   @ApiPropertyOptional({ example: '2024-01-01T00:00:00Z' })
   @IsDateString()
   @IsOptional()
