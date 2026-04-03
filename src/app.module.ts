@@ -10,7 +10,7 @@ import { JwtGatewayGuard } from 'common/guards/jwt-gateway.guard';
 import { PermissionsModule } from 'modules/rbac/permissions/permissions.module';
 import { AssignmentsModule } from 'modules/rbac/assignments/assignments.module';
 import { PermissionOverridesModule } from 'modules/rbac/permission-overrides/permission-overrides.module';
-
+import { RbacGrpcServer } from './grpc/rbac-grpc.server';
 
 
 @Module({
@@ -48,6 +48,7 @@ import { PermissionOverridesModule } from 'modules/rbac/permission-overrides/per
       provide: APP_GUARD,
       useClass: JwtGatewayGuard,
     },
+    RbacGrpcServer
   ]
 })
 export class AppModule {}

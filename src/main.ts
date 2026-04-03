@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
+import { RbacGrpcServer } from 'grpc/rbac-grpc.server';
 
 
 async function bootstrap() {
@@ -11,6 +12,8 @@ async function bootstrap() {
       transform: true, // 🔥 obligatoire
     }),
   );
+  // const grpcServer = app.get(RbacGrpcServer);
+  // await grpcServer.onModuleInit();
   // Swagger documentation
   const config = new DocumentBuilder()
     .setTitle('RBAC Service API')

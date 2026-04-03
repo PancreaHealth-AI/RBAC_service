@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package rbac;
+
+service RBACService {
+  rpc CheckPermission (PermissionRequest) returns (PermissionResponse);
+}
+
+message PermissionRequest {
+  string user_id = 1;
+  string permission_code = 2;
+  string assignment_id = 3; // optionnel
+}
+
+message PermissionResponse {
+  bool has_permission = 1;
+}

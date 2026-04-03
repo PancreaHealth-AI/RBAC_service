@@ -357,7 +357,7 @@ async getPermissionCodesForAssignment(userId: string, assignmentId: string): Pro
     const cacheKey = `user:${userId}:assignment:${assignmentId}:permcodes`;
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
-
+    console.log(`Cache miss for ${cacheKey}, fetching from DB...`);
     // Permissions de base du rôle (isGranted = true)
     const rolePerms = await this.rolePermissionRepository.find({
       where: { roleId: assignment.roleId, isGranted: true },
@@ -393,6 +393,7 @@ async getPermissionCodesForAssignment(userId: string, assignmentId: string): Pro
    */
   async checkPermissionForAssignment(userId: string, assignmentId: string, permissionCode: string): Promise<boolean> {
     const perms = await this.getPermissionCodesForAssignment(userId, assignmentId);
+    console.log(`Permissions for user ${userId} and assignment ${assignmentId}:`, perms);
     return perms.includes(permissionCode);
   }
 
