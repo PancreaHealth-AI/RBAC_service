@@ -16,6 +16,8 @@ import { CheckPermissionDto } from './dto/check-permission.dto';
 import { CreatePermissionOverrideDto } from './dto/permission-override.dto';
 import { GrantTemporaryPermissionDto } from './dto/temporary-permission.dto';
 import { UpdateRoleAssignmentDto } from './dto/update-role-assignment.dto';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import Redis from 'ioredis';
 
 @Injectable()
 export class AssignmentsService {
@@ -30,6 +32,7 @@ export class AssignmentsService {
     private permissionRepository: Repository<Permission>,
     @InjectRepository(RolePermission)
     private rolePermissionRepository: Repository<RolePermission>,
+    @InjectRedis() private readonly redis: Redis,
   ) {}
 
   /**
@@ -136,26 +139,53 @@ export class AssignmentsService {
 
     return validAssignments;
   }
+  /**
+   * Récupérer tous les rôles attribués à un utilisateur
+   */
+  async getUserRoles(userId: string) {
+    const assignments = await this.roleAssignmentRepository.find({
+      where: { userId, isActive: true },
+      relations: ['role'],
+      order: { assignedAt: 'DESC' },
+    });
+
+    return assignments.map((assignment) => ({
+      id: assignment.id,
+      roleId: assignment.roleId,
+      roleName: assignment.role.name,
+      roleCode: assignment.role.code,
+      roleType: assignment.role.roleType,
+      scopeType: assignment.scopeType,
+      scopeId: assignment.scopeId,
+      assignedBy: assignment.assignedBy,
+      assignedAt: assignment.assignedAt,
+      expiresAt: assignment.expiresAt,
+      isActive: assignment.isActive,
+    }));
+  }
 
   /**
-   * Calculer les permissions effectives d'un utilisateur
+   * Récupérer les permissions effectives d'un utilisateur en fonction de ses rôles et des surcharges
    */
-  async getEffectivePermissions(userId: string) {
+    async getEffectivePermissionsByRole(userId: string) {
     // Récupérer tous les rôles actifs de l'utilisateur
-    const assignments = await this.getUserAssignments(userId);
-    // console.log('Assignments for user', userId, assignments);
+    const assignments = await this.roleAssignmentRepository.find({
+      where: { userId, isActive: true },
+      relations: ['role'],
+    });
+
     if (assignments.length === 0) {
       return {
         userId,
-        permissions: [],
-        totalCount: 0,
         roles: [],
+        totalPermissionsCount: 0,
       };
     }
 
-    const roleIds = assignments.map((a) => a.roleId);
+    const assignmentIds = assignments.map(a => a.id);
+    const roleIds = assignments.map(a => a.roleId);
 
-    // Récupérer toutes les permissions des rôles
+    // Récupérer toutes les permissions de base des rôles (isGranted = true)
     const rolePermissions = await this.rolePermissionRepository.find({
       where: {
         roleId: In(roleIds),
@@ -164,100 +194,232 @@ export class AssignmentsService {
       relations: ['permission', 'role'],
     });
 
-    // Récupérer les surcharges de permissions
-    const assignmentIds = assignments.map((a) => a.id);
+    // Récupérer toutes les surcharges pour ces assignments
     const overrides = await this.permissionOverrideRepository.find({
-      where: {
-        roleAssignmentId: In(assignmentIds),
-      },
+      where: { roleAssignmentId: In(assignmentIds) },
       relations: ['permission'],
     });
-    console.log('Overrides for user', userId, overrides);
-    // Filtrer les surcharges expirées
-    // const activeOverrides = overrides.filter((o) => o.isActive);
-    // console.log('Active Overrides for user', userId, activeOverrides);
-    // Construire le set de permissions effectives
-    const permissionsMap = new Map<string, any>();
 
-    // Ajouter les permissions des rôles
-    rolePermissions.forEach((rp) => {
-      if (!permissionsMap.has(rp.permission.code)) {
-        permissionsMap.set(rp.permission.code, {
+    // Grouper les permissions par assignmentId (rôle)
+    const permissionsByAssignment = new Map<string, Map<string, any>>();
+
+    // Initialiser pour chaque assignment
+    for (const assignment of assignments) {
+      permissionsByAssignment.set(assignment.id, new Map());
+    }
+
+    // Ajouter les permissions héritées des rôles
+    for (const rp of rolePermissions) {
+      // Trouver l'assignment correspondant à ce rôle (l'utilisateur a ce rôle)
+      const assignment = assignments.find(a => a.roleId === rp.roleId);
+      if (!assignment) continue;
+
+      const permMap = permissionsByAssignment.get(assignment.id);
+      if (!permMap) continue;
+      if (!permMap.has(rp.permission.code)) {
+        permMap.set(rp.permission.code, {
           id: rp.permission.id,
           code: rp.permission.code,
           name: rp.permission.name,
           resourceType: rp.permission.resourceType,
           action: rp.permission.action,
           scope: rp.permission.scope,
-          source: 'role',
-          roleId: rp.role.id,
-          roleName: rp.role.name,
           constraints: rp.constraints,
+          source: 'role',
         });
       }
-    });
+    }
 
     // Appliquer les surcharges
-    overrides.forEach((override) => {
+    for (const override of overrides) {
+      const permMap = permissionsByAssignment.get(override.roleAssignmentId);
+      if (!permMap) continue;
+
       const permCode = override.permission.code;
 
       if (override.overrideType === OverrideType.GRANT) {
-        // Ajouter la permission
-        if (!permissionsMap.has(permCode)) {
-          permissionsMap.set(permCode, {
+        if (!permMap.has(permCode)) {
+          permMap.set(permCode, {
             id: override.permission.id,
             code: override.permission.code,
             name: override.permission.name,
             resourceType: override.permission.resourceType,
             action: override.permission.action,
             scope: override.permission.scope,
-            source: 'override',
+            source: 'override-grant',
           });
         }
       } else if (override.overrideType === OverrideType.REVOKE) {
-        // Retirer la permission
-        permissionsMap.delete(permCode);
+        permMap.delete(permCode);
       }
-    });
+      // Pour RESTRICT, vous pouvez ajuster les constraints existantes (optionnel)
+    }
 
-    const permissions = Array.from(permissionsMap.values());
+    // Construire la réponse par rôle
+    const rolesWithPermissions: Array<{
+      role: {
+        assignmentId: string;
+        id: string;
+        name: string;
+        code: string;
+        roleType: any;
+        scopeType: any;
+        scopeId: string;
+        expiresAt: Date | null;
+      };
+      permissions: any[];
+    }> = [];
+    let totalPerms = 0;
+
+    for (const assignment of assignments) {
+      const permMap = permissionsByAssignment.get(assignment.id);
+      const permissions = Array.from(permMap!.values());
+      totalPerms += permissions.length;
+
+      rolesWithPermissions.push({
+        role: {
+          assignmentId: assignment.id,
+          id: assignment.role.id,
+          name: assignment.role.name,
+          code: assignment.role.code,
+          roleType: assignment.role.roleType,
+          scopeType: assignment.scopeType,
+          scopeId: assignment.scopeId,
+          expiresAt: assignment.expiresAt,
+        },
+        permissions,
+      });
+    }
 
     return {
       userId,
-      permissions,
-      totalCount: permissions.length,
-      roles: assignments.map((a) => ({
-        id: a.role.id,
-        name: a.role.name,
-        code: a.role.code,
-      })),
+      roles: rolesWithPermissions,
+      totalPermissionsCount: totalPerms,
     };
+  }
+  /**
+   * Récupérer les permissions effectives d'un utilisateur (version plate)
+   */
+  async getPermissionCodesByAssignment(userId: string, assignmentId: string): Promise<string[]> {
+    // 1. Vérifier que l'attribution appartient bien à l'utilisateur
+    const assignment = await this.roleAssignmentRepository.findOne({
+      where: { id: assignmentId, userId, isActive: true },
+    });
+    if (!assignment) throw new ForbiddenException();
+
+    // 2. Cache Redis (clé simple)
+    const cacheKey = `user:${userId}:assignment:${assignmentId}:permcodes`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    // 3. Récupérer les permissions du rôle (isGranted=true)
+    const rolePerms = await this.rolePermissionRepository.find({
+      where: { roleId: assignment.roleId, isGranted: true },
+      relations: ['permission'],
+    });
+
+    // 4. Récupérer les surcharges pour cet assignment
+    const overrides = await this.permissionOverrideRepository.find({
+      where: { roleAssignmentId: assignmentId },
+      relations: ['permission'],
+    });
+
+    // 5. Construire un Set de codes de permission
+    const permSet = new Set<string>();
+    for (const rp of rolePerms) {
+      permSet.add(rp.permission.code); // ou `resourceType:action` si préféré
+    }
+    for (const ov of overrides) {
+      if (ov.overrideType === OverrideType.GRANT) {
+        permSet.add(ov.permission.code);
+      } else if (ov.overrideType === OverrideType.REVOKE) {
+        permSet.delete(ov.permission.code);
+      }
+    }
+
+    const result = Array.from(permSet);
+    // 6. Stocker en Redis (TTL 5 min)
+    await this.redis.set(cacheKey, JSON.stringify(result), 'EX', 300);
+    return result;
+  }
+
+  /**
+ * Récupère les codes de permission effectifs pour une attribution de rôle donnée (assignmentId)
+ */
+async getPermissionCodesForAssignment(userId: string, assignmentId: string): Promise<string[]> {
+    // Vérifier que l'attribution appartient bien à l'utilisateur
+    const assignment = await this.roleAssignmentRepository.findOne({
+      where: { id: assignmentId, userId, isActive: true },
+      relations: ['role'],
+    });
+    if (!assignment) throw new ForbiddenException('Attribution non trouvée ou non autorisée');
+
+    const cacheKey = `user:${userId}:assignment:${assignmentId}:permcodes`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    // Permissions de base du rôle (isGranted = true)
+    const rolePerms = await this.rolePermissionRepository.find({
+      where: { roleId: assignment.roleId, isGranted: true },
+      relations: ['permission'],
+    });
+
+    // Surcharges pour cette attribution
+    const overrides = await this.permissionOverrideRepository.find({
+      where: { roleAssignmentId: assignmentId },
+      relations: ['permission'],
+    });
+
+    // Construire le Set de codes
+    const permSet = new Set<string>();
+    for (const rp of rolePerms) {
+      permSet.add(rp.permission.code);
+    }
+    for (const ov of overrides) {
+      if (ov.overrideType === OverrideType.GRANT) {
+        permSet.add(ov.permission.code);
+      } else if (ov.overrideType === OverrideType.REVOKE) {
+        permSet.delete(ov.permission.code);
+      }
+    }
+
+    const result = Array.from(permSet);
+    await this.redis.set(cacheKey, JSON.stringify(result), 'EX', 300);
+    return result;
+  }
+
+  /**
+   * Vérifie si l'utilisateur possède une permission donnée pour un assignment spécifique.
+   */
+  async checkPermissionForAssignment(userId: string, assignmentId: string, permissionCode: string): Promise<boolean> {
+    const perms = await this.getPermissionCodesForAssignment(userId, assignmentId);
+    return perms.includes(permissionCode);
   }
 
   /**
    * Vérifier si un utilisateur a une permission spécifique
    */
-  async checkPermission(checkPermissionDto: CheckPermissionDto) {
-    const { userId, resourceType, action, resourceId, context } = checkPermissionDto;
+  // async checkPermission(checkPermissionDto: CheckPermissionDto) {
+  //   const { userId, resourceType, action, resourceId, context } = checkPermissionDto;
 
-    // Récupérer les permissions effectives
-    const effectivePerms = await this.getEffectivePermissions(userId);
+  //   // Récupérer les permissions effectives
+  //   const effectivePerms = await this.getEffectivePermissions(userId);
 
-    // Chercher la permission correspondante
-    const hasPermission = effectivePerms.permissions.some(
-      (perm) => perm.resourceType === resourceType && perm.action === action,
-    );
+  //   // Chercher la permission correspondante
+  //   const hasPermission = effectivePerms.permissions.some(
+  //     (perm) => perm.resourceType === resourceType && perm.action === action,
+  //   );
 
-    return {
-      userId,
-      resourceType,
-      action,
-      hasPermission,
-      permissions: effectivePerms.permissions.filter(
-        (p) => p.resourceType === resourceType && p.action === action,
-      ),
-    };
-  }
+  //   return {
+  //     userId,
+  //     resourceType,
+  //     action,
+  //     hasPermission,
+  //     permissions: effectivePerms.permissions.filter(
+  //       (p) => p.resourceType === resourceType && p.action === action,
+  //     ),
+  //   };
+  // }
 
   /**
    * Ajouter une surcharge de permission pour un utilisateur

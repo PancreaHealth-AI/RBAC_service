@@ -11,6 +11,9 @@ import {
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
+  Req,
+  UnauthorizedException,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,6 +22,7 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { AssignmentsService } from './assignments.service';
 import { AssignRoleDto } from './dto/assign-role.dto';
@@ -79,6 +83,26 @@ export class AssignmentsController {
   ) {
     return this.assignmentsService.updateAssignment(assignmentId, updateDto);
   }
+  /**
+   * Récupérer tous les rôles d'un utilisateur
+   */
+  @Get('users/:userId/roles')
+  @ApiOperation({ summary: 'Récupérer tous les rôles d’un utilisateur' })
+  @ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Liste des rôles attribués' })
+  async getUserRoles(@Param('userId', ParseUUIDPipe) userId: string) {
+    return this.assignmentsService.getUserRoles(userId);
+  }
+
+   @Get('me/roles')
+    @ApiOperation({ summary: 'Récupérer les rôles de l’utilisateur connecté' })
+    async getMyRoles(@Request() req,) {
+      if (!req.user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const userId = req.user.sub; 
+      return this.assignmentsService.getUserRoles(userId);
+    }
 
   /**
    * Récupérer les permissions effectives d'un utilisateur
@@ -92,19 +116,64 @@ export class AssignmentsController {
     type: EffectivePermissionsResponseDto,
   })
   async getEffectivePermissions(@Param('userId', ParseUUIDPipe) userId: string) {
-    return this.assignmentsService.getEffectivePermissions(userId);
+    return this.assignmentsService.getEffectivePermissionsByRole(userId);
+  }
+  /**
+   * Récupérer les codes de permission pour une attribution de rôle spécifique
+   */
+  // @Get(':assignmentId/permissions')
+  // @ApiOperation({ summary: 'Récupérer les codes de permission pour une attribution' })
+  // async getPermissionCodes(
+  //   @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
+  //   @Request() req,
+  // ) {
+  //   const userId = req.user.sub;
+  //   if (!userId) throw new UnauthorizedException();
+  //   return this.assignmentsService.getPermissionCodesByAssignment(userId, assignmentId);
+  // }
+  /**
+   * Récupérer les codes de permission effectifs pour une attribution donnée
+   */
+  @Get(':assignmentId/permissions/codes')
+  @ApiOperation({ summary: 'Codes de permission effectifs pour un rôle attribué' })
+  @ApiParam({ name: 'assignmentId', type: 'string', format: 'uuid' })
+  async getPermissionCodes(
+    @Param('assignmentId') assignmentId: string,
+    @Request() req,
+  ) {
+    const userId = req.user?.sub;
+    if (!userId) throw new UnauthorizedException();
+    return this.assignmentsService.getPermissionCodesForAssignment(userId, assignmentId);
+  }
+
+  /**
+   * Vérifier si une permission est accordée pour cette attribution
+   */
+  @Get(':assignmentId/check-permission')
+  @ApiOperation({ summary: 'Vérifier une permission pour cette attribution' })
+  @ApiParam({ name: 'assignmentId', type: 'string', format: 'uuid' })
+  @ApiQuery({ name: 'code', type: 'string' })
+  async checkPermission(
+    @Param('assignmentId') assignmentId: string,
+    @Query('code') permissionCode: string,
+    @Request() req,
+  ) {
+    const userId = req.user?.sub;
+    if (!userId) throw new UnauthorizedException();
+    const has = await this.assignmentsService.checkPermissionForAssignment(userId, assignmentId, permissionCode);
+    return { assignmentId, permissionCode, has };
   }
 
   /**
    * Vérifier si un utilisateur a une permission
    */
-  @Post('check-permission')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Vérifier si un utilisateur possède une permission' })
-  @ApiResponse({ status: 200, description: 'Résultat de la vérification' })
-  async checkPermission(@Body() checkPermissionDto: CheckPermissionDto) {
-    return this.assignmentsService.checkPermission(checkPermissionDto);
-  }
+  // @Post('check-permission')
+  // @HttpCode(HttpStatus.OK)
+  // @ApiOperation({ summary: 'Vérifier si un utilisateur possède une permission' })
+  // @ApiResponse({ status: 200, description: 'Résultat de la vérification' })
+  // async checkPermission(@Body() checkPermissionDto: CheckPermissionDto) {
+  //   return this.assignmentsService.checkPermission(checkPermissionDto);
+  // }
 
   /**
    * Ajouter/Modifier permissions personnalisées pour un rôle d'utilisateur
