@@ -4,14 +4,33 @@ package rbac;
 
 service RBACService {
   rpc CheckPermission (PermissionRequest) returns (PermissionResponse);
+  rpc GetUserRoles (GetUserRolesRequest) returns (GetUserRolesResponse);
 }
 
 message PermissionRequest {
   string user_id = 1;
   string permission_code = 2;
-  string assignment_id = 3; // optionnel
+  string assignment_id = 3;
 }
 
 message PermissionResponse {
   bool has_permission = 1;
+}
+
+message GetUserRolesRequest {
+  string user_id = 1;
+}
+
+message UserRole {
+  string assignment_id = 1;
+  string role_id = 2;
+  string role_name = 3;
+  string role_code = 4;
+  string role_type = 5;
+  string scope_type = 6;
+  string scope_id = 7;
+}
+
+message GetUserRolesResponse {
+  repeated UserRole roles = 1;
 }

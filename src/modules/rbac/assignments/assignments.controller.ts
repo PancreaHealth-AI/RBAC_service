@@ -147,6 +147,18 @@ export class AssignmentsController {
   }
 
   /**
+   * Récupérer les permissions effectives pour un utlisateur connecté
+   */
+  @Get('me/effective-permissions')
+  @ApiOperation({ summary: 'Récupérer les permissions effectives pour un utilisateur connecté' })
+  async getMyEffectivePermissions(@Request() req) {
+    const userId = req.user?.sub;
+    const assignmentId = req.user?.assignedId;
+    if (!userId) throw new UnauthorizedException();
+    return this.assignmentsService.getPermissionCodesForAssignment(userId, assignmentId);
+  }
+
+  /**
    * Vérifier si une permission est accordée pour cette attribution
    */
   @Get(':assignmentId/check-permission')
