@@ -1,16 +1,19 @@
 import { Module } from '@nestjs/common';
-import { RolesModule } from 'modules/rbac/roles/roles.module';
+import { RolesModule } from './modules/rbac/roles/roles.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { getDatabaseConfig } from './config/database.config';
-import { getRedisConfig } from 'config/redis.config';
+import { getRedisConfig } from './config/redis.config';
 import { RedisModule } from '@nestjs-modules/ioredis';
 import { APP_GUARD } from '@nestjs/core';
-import { JwtGatewayGuard } from 'common/guards/jwt-gateway.guard';
-import { PermissionsModule } from 'modules/rbac/permissions/permissions.module';
-import { AssignmentsModule } from 'modules/rbac/assignments/assignments.module';
-import { PermissionOverridesModule } from 'modules/rbac/permission-overrides/permission-overrides.module';
+import { JwtGatewayGuard } from './common/guards/jwt-gateway.guard';
+import { PermissionsModule } from './modules/rbac/permissions/permissions.module';
+import { AssignmentsModule } from './modules/rbac/assignments/assignments.module';
+import { PermissionOverridesModule } from './modules/rbac/permission-overrides/permission-overrides.module';
 import { RbacGrpcServer } from './grpc/rbac-grpc.server';
+//  a integre apres
+// import { JwtGatewayGuard } from 'medical_platform_shared';
+
 
 
 @Module({

@@ -37,6 +37,7 @@
     "class-validator": "^0.15.1",
     "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.3",
+    "medical_platform_shared": "^1.1.0",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
