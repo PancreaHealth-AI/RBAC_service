@@ -7,7 +7,7 @@ import * as fs from 'fs';
 
 @Injectable()
 export class RbacGrpcServer implements OnModuleInit {
-  private server: grpc.Server;
+  private server!: grpc.Server;
   private readonly logger = new Logger(RbacGrpcServer.name);
   private port: number;
 
@@ -59,7 +59,8 @@ export class RbacGrpcServer implements OnModuleInit {
             reject(err);
             return;
           }
-          this.logger.log(`gRPC server bound on port ${boundPort}`);
+          this.server.start();
+          this.logger.log(`gRPC server bound and started on port ${boundPort}`);
           resolve();
         },
       );
@@ -90,15 +91,22 @@ export class RbacGrpcServer implements OnModuleInit {
     const { user_id } = call.request;
     try {
       const roles = await this.assignmentsService.getUserRoles(user_id);
-      const mapped = roles.map((r) => ({
-        assignment_id: r.id,
-        role_id: r.roleId,
-        role_name: r.roleName,
-        role_code: r.roleCode,
-        role_type: r.roleType,
-        scope_type: r.scopeType ?? '',
-        scope_id: r.scopeId ?? '',
-      }));
+      const mapped = roles.map((r) => {
+      
+
+        return {
+          assignment_id: r.id,
+          role_id: r.roleId,
+          role_name: r.roleName,
+          role_code: r.roleCode,
+          role_type: r.roleType,
+          scope_type: r.scopeType ?? '',
+          scope_id: r.scopeId ?? '',
+          // hospital_id: r.hospitalId ?? null,
+          // department_id: r.departmentId ?? null,
+          // service_id: r.serviceId ?? null,
+        };
+      });
       console.log(`cote server grpc : User ${user_id} has roles:`, mapped);
       callback(null, { roles: mapped });
     } catch (err) {

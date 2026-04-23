@@ -29,6 +29,9 @@ message UserRole {
   string role_type = 5;
   string scope_type = 6;
   string scope_id = 7;
+  string hospital_id = 8; // hospital UUID
+  string department_id = 9; // department UUID
+  string service_id = 10; // service UUID
 }
 
 message GetUserRolesResponse {

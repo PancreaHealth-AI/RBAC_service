@@ -28,16 +28,16 @@ export enum ScopeType {
 @Index(['scopeType', 'scopeId'])
 export class Role {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ unique: true, length: 100 })
-  name: string;
+  name!: string;
 
   @Column({ unique: true, length: 50 })
-  code: string;
+  code!: string;
 
   @Column({ type: 'text', nullable: true })
-  description: string;
+  description!: string;
 
   @Column({
     name: 'role_type',
@@ -45,7 +45,7 @@ export class Role {
     enum: RoleType,
     default: RoleType.SYSTEM,
   })
-  roleType: RoleType;
+  roleType!: RoleType;
 
   @Column({
     name: 'scope_type',
@@ -53,27 +53,27 @@ export class Role {
     enum: ScopeType,
     default: ScopeType.GLOBAL,
   })
-  scopeType: ScopeType;
+  scopeType!: ScopeType;
 
   @Column({ name: 'scope_id', type: 'uuid', nullable: true })
-  scopeId: string;
+  scopeId!: string;
 
   @Column({ name: 'created_by', type: 'uuid', nullable: true })
-  createdBy: string;
+  createdBy!: string;
 
   @Column({ name: 'is_active', default: true })
-  isActive: boolean;
+  isActive!: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @Column({ name: 'deleted_at', type: 'timestamp', nullable: true })
-  deletedAt: Date;
+  deletedAt!: Date;
 
   // Relations seront définies dans les modules respectifs
   @OneToMany(() => RolePermission, (rolePermission) => rolePermission.role)
-  rolePermissions: RolePermission[];
+  rolePermissions!: RolePermission[];
 }

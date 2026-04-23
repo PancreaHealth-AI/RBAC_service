@@ -7,17 +7,17 @@ export class CreatePermissionOverrideDto {
   @ApiProperty({ example: 'role-assignment-uuid', description: 'ID de l\'attribution de rôle' })
   @IsUUID()
   @IsNotEmpty()
-  roleAssignmentId: string;
+  roleAssignmentId!: string;
 
   @ApiProperty({ example: 'permission-uuid', description: 'ID de la permission' })
   @IsUUID()
   @IsNotEmpty()
-  permissionId: string;
+  permissionId!: string;
 
   @ApiProperty({ enum: OverrideType, description: 'Type de surcharge' })
   @IsEnum(OverrideType)
   @IsNotEmpty()
-  overrideType: OverrideType;
+  overrideType!: OverrideType;
 
   @ApiPropertyOptional({ example: 'Accès temporaire pour urgence', description: 'Raison de la surcharge' })
   @IsString()

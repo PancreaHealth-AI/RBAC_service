@@ -43,6 +43,9 @@ export class JwtGatewayGuard implements CanActivate {
         assignedId: payload.assignedId ?? null,
         scope: payload.scope ?? null,
         scopeId: payload.scopeId ?? null,
+        hospitalId: payload.hospitalId ?? null, // hospital UUID
+        departmentId: payload.departmentId ?? null, // department UUID
+        serviceId: payload.serviceId ?? null, // service UUID
       };
       console.log('Token validé, payload:', request.user);
       return true;

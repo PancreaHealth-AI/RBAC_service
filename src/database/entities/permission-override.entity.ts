@@ -21,40 +21,40 @@ export enum OverrideType {
 @Index(['permissionId'])
 export class PermissionOverride {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ name: 'role_assignment_id', type: 'uuid' })
-  roleAssignmentId: string;
+  roleAssignmentId!: string;
 
   @ManyToOne(() => RoleAssignment, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'role_assignment_id' })
-  roleAssignment: RoleAssignment;
+  roleAssignment!: RoleAssignment;
 
   @Column({ name: 'permission_id', type: 'uuid' })
-  permissionId: string;
+  permissionId!: string;
 
   @ManyToOne(() => Permission, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'permission_id' })
-  permission: Permission;
+  permission!: Permission;
 
   @Column({
     name: 'override_type',
     type: 'enum',
     enum: OverrideType,
   })
-  overrideType: OverrideType;
+  overrideType!: OverrideType;
 
   @Column({ type: 'text', nullable: true })
-  reason: string;
+  reason!: string;
 
   @Column({ name: 'approved_by', type: 'uuid', nullable: true })
-  approvedBy: string;
+  approvedBy!: string;
 
   @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+  createdAt!: Date;
 
   @Column({ name: 'expires_at', type: 'timestamp', nullable: true })
-  expiresAt: Date;
+  expiresAt!: Date;
 
   get isExpired(): boolean {
     if (!this.expiresAt) return false;

@@ -16,17 +16,17 @@ import { Role, ScopeType } from './role.entity';
 @Index(['scopeType', 'scopeId'])
 export class RoleAssignment {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ name: 'user_id', type: 'uuid' })
-  userId: string;
+  userId!: string;
 
   @Column({ name: 'role_id', type: 'uuid' })
-  roleId: string;
+  roleId!: string;
 
   @ManyToOne(() => Role, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'role_id' })
-  role: Role;
+  role!: Role;
 
   @Column({
     name: 'scope_type',
@@ -34,25 +34,25 @@ export class RoleAssignment {
     enum: ScopeType,
     default: ScopeType.GLOBAL,
   })
-  scopeType: ScopeType;
+  scopeType!: ScopeType;
 
   @Column({ name: 'scope_id', type: 'uuid', nullable: true })
-  scopeId: string;
+  scopeId!: string;
 
   @Column({ name: 'assigned_by', type: 'uuid', nullable: true })
-  assignedBy: string;
+  assignedBy!: string;
 
   @CreateDateColumn({ name: 'assigned_at' })
-  assignedAt: Date;
+  assignedAt!: Date;
 
   @Column({ name: 'expires_at', type: 'timestamp', nullable: true })
-  expiresAt: Date;
+  expiresAt!: Date;
 
   @Column({ name: 'is_active', default: true })
-  isActive: boolean;
+  isActive!: boolean;
 
   @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
+  updatedAt!: Date;
 
   get isExpired(): boolean {
     if (!this.expiresAt) return false;

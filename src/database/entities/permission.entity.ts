@@ -43,46 +43,46 @@ export enum PermissionScope {
 @Index(['resourceType', 'action'])
 export class Permission {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ unique: true, length: 100 })
-  code: string;
+  code!: string;
 
   @Column({ length: 255 })
-  name: string;
+  name!: string;
 
   @Column({
     name: 'resource_type',
     type: 'enum',
     enum: ResourceType,
   })
-  resourceType: ResourceType;
+  resourceType!: ResourceType;
 
   @Column({
     type: 'enum',
     enum: Action,
   })
-  action: Action;
+  action!: Action;
 
   @Column({
     type: 'enum',
     enum: PermissionScope,
     default: PermissionScope.SYSTEM,
   })
-  scope: PermissionScope;
+  scope!: PermissionScope;
 
   @Column({ name: 'requires_consent', default: false })
-  requiresConsent: boolean;
+  requiresConsent!: boolean;
 
   @Column({ type: 'text', nullable: true })
-  description: string;
+  description!: string;
 
   @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+  createdAt!: Date;
 
   @Column({ name: 'created_by', type: 'uuid', nullable: true })
-  createdBy: string;
+  createdBy!: string;
 
   @Column({ name: 'deleted_at', type: 'timestamp', nullable: true })
-  deletedAt: Date;
+  deletedAt!: Date;
 }

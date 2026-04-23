@@ -14,28 +14,28 @@ import { Permission } from './permission.entity';
 @Index(['roleId', 'permissionId'], { unique: true })
 export class RolePermission {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ name: 'role_id', type: 'uuid' })
-  roleId: string;
+  roleId!: string;
 
   @ManyToOne(() => Role, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'role_id' })
-  role: Role;
+  role!: Role;
 
   @Column({ name: 'permission_id', type: 'uuid' })
-  permissionId: string;
+  permissionId!: string;
 
   @ManyToOne(() => Permission, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'permission_id' })
-  permission: Permission;
+  permission!: Permission;
 
   @Column({ name: 'is_granted', default: true })
-  isGranted: boolean;
+  isGranted!: boolean;
 
   @Column({ type: 'jsonb', nullable: true })
-  constraints: Record<string, any> | null;
+  constraints!: Record<string, any> | null;
 
   @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+  createdAt!: Date;
 }
