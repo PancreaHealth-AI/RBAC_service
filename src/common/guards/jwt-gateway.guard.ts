@@ -7,12 +7,18 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
 import * as fs from 'fs';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import Redis from 'ioredis';
 
 @Injectable()
 export class JwtGatewayGuard implements CanActivate {
   private publicKey: string;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    @InjectRedis()
+    private readonly redis: Redis,
+) {
     const keyPath = this.configService.get<string>('JWT_PUBLIC_KEY_PATH');
     if (!keyPath) {
       throw new Error('JWT_PUBLIC_KEY_PATH is not defined in configuration');
@@ -20,7 +26,7 @@ export class JwtGatewayGuard implements CanActivate {
     this.publicKey = fs.readFileSync(keyPath, 'utf8');
   }
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
 
     const token = this.extractToken(request);
@@ -33,7 +39,16 @@ export class JwtGatewayGuard implements CanActivate {
         algorithms: ['RS256'],
       }) as any;
 
-      // ← exposer tous les champs du token dans req.user
+      const sessionId = payload.sessionId;
+
+      // 🔥 CHECK REDIS BLACKLIST
+      const blacklistKey = `blacklist:session:${sessionId}`;
+      const isRevoked = await this.redis.get(blacklistKey);
+
+      if (isRevoked) {
+        throw new UnauthorizedException('Session révoquée');
+      }
+
       request.user = {
         sub: payload.sub,
         username: payload.username,
@@ -43,11 +58,11 @@ export class JwtGatewayGuard implements CanActivate {
         assignedId: payload.assignedId ?? null,
         scope: payload.scope ?? null,
         scopeId: payload.scopeId ?? null,
-        hospitalId: payload.hospitalId ?? null, // hospital UUID
-        departmentId: payload.departmentId ?? null, // department UUID
-        serviceId: payload.serviceId ?? null, // service UUID
+        hospitalId: payload.hospitalId ?? null,
+        departmentId: payload.departmentId ?? null,
+        serviceId: payload.serviceId ?? null,
       };
-      console.log('Token validé, payload:', request.user);
+
       return true;
     } catch {
       throw new UnauthorizedException('Token invalide ou expiré');
