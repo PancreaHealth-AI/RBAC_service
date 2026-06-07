@@ -1,15 +1,32 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RolesController } from './permissions.controller';
+import { PermissionsController } from './permissions.controller';
+import { PermissionsService } from './permissions.service';
 
-describe('RolesController', () => {
-  let controller: RolesController;
+describe('PermissionsController', () => {
+  let controller: PermissionsController;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [RolesController],
+      controllers: [PermissionsController],
+      providers: [
+        {
+          provide: PermissionsService,
+          useValue: {
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+            seedPermissions: jest.fn(),
+            findByResource: jest.fn(),
+            groupByResource: jest.fn(),
+            getPermissionsByRole: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
-    controller = module.get<RolesController>(RolesController);
+    controller = module.get<PermissionsController>(PermissionsController);
   });
 
   it('should be defined', () => {
