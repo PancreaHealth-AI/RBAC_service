@@ -41,7 +41,7 @@ export class JwtGatewayGuard implements CanActivate {
 
       const sessionId = payload.sessionId;
 
-      // 🔥 CHECK REDIS BLACKLIST
+      // CHECK REDIS BLACKLIST
       const blacklistKey = `blacklist:session:${sessionId}`;
       const isRevoked = await this.redis.get(blacklistKey);
 
