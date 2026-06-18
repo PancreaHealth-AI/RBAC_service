@@ -1,12 +1,27 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { RbacGrpcServer } from './grpc/rbac-grpc.server';
+import { MessagingService } from './modules/rbac/messaging-module/messaging.service';
+import { TechnicalExceptionFilter } from './common/filters/technical-exception.filter';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+
+  const reflector = app.get(Reflector);
+  const messagingService = app.get(MessagingService);
+
+  // Exception filter global
+  app.useGlobalFilters(new TechnicalExceptionFilter(messagingService));
+
+  // Interceptor global
+  app.useGlobalInterceptors(new AuditInterceptor(reflector, messagingService));
+
+
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true, // 🔥 obligatoire

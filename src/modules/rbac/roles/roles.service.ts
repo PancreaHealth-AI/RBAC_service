@@ -12,7 +12,7 @@ import { RolePermission } from '@database/entities/role-permission.entity';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { QueryRolesDto } from './dto/query-roles.dto';
-import { console } from 'inspector';
+import { MessagingService } from '../messaging-module/messaging.service';
 
 @Injectable()
 export class RolesService {
@@ -23,13 +23,13 @@ export class RolesService {
     private permissionRepository: Repository<Permission>,
     @InjectRepository(RolePermission)
     private rolePermissionRepository: Repository<RolePermission>,
+    private messagingService: MessagingService,
   ) {}
 
   /**
    * Créer un nouveau rôle
    */
   async create(createRoleDto: CreateRoleDto, createdBy: string) {
-    console.log("createBy:", createdBy)
     // Vérifier si le code ou le nom existe déjà
     const existingRole = await this.roleRepository.findOne({
       where: [
@@ -37,7 +37,7 @@ export class RolesService {
         { name: createRoleDto.name, deletedAt: IsNull() },
       ],
     });
-    console.log("existingRole:", existingRole)
+
     if (existingRole) {
       const conflictField = existingRole.code === createRoleDto.code ? 'code' : 'nom';
       throw new ConflictException(`Un rôle avec ce ${conflictField} existe déjà`);
@@ -49,7 +49,16 @@ export class RolesService {
       createdBy,
     });
     const savedRole = await this.roleRepository.save(role);
-    console.log("saved role : ", savedRole)
+
+    this.messagingService.logAudit({
+      action: 'CREATE_ROLE',
+      userId: createdBy,
+      resource: 'role',
+      resourceId: savedRole.id,
+      status: 'SUCCESS',
+      metadata: { code: savedRole.code, name: savedRole.name, roleType: savedRole.roleType },
+    });
+
     // Assigner les permissions si fournies
     if (createRoleDto.permissionIds && createRoleDto.permissionIds.length > 0) {
       await this.assignPermissions(savedRole.id, createRoleDto.permissionIds);
@@ -178,7 +187,7 @@ export class RolesService {
   /**
    * Mettre à jour un rôle
    */
-  async update(id: string, updateRoleDto: UpdateRoleDto) {
+  async update(id: string, updateRoleDto: UpdateRoleDto, updatedBy?: string) {
     const role = await this.roleRepository.findOne({
       where: { id, deletedAt: IsNull() },
     });
@@ -190,6 +199,15 @@ export class RolesService {
     // Mettre à jour les champs de base
     Object.assign(role, updateRoleDto);
     await this.roleRepository.save(role);
+
+    this.messagingService.logAudit({
+      action: 'UPDATE_ROLE',
+      userId: updatedBy,
+      resource: 'role',
+      resourceId: id,
+      status: 'SUCCESS',
+      metadata: { changes: updateRoleDto },
+    });
 
     // Mettre à jour les permissions si fournies
     if (updateRoleDto.permissionIds) {
@@ -208,7 +226,7 @@ export class RolesService {
   /**
    * Supprimer un rôle (soft delete)
    */
-  async remove(id: string) {
+  async remove(id: string, deletedBy?: string) {
     const role = await this.roleRepository.findOne({
       where: { id, deletedAt: IsNull() },
     });
@@ -233,6 +251,15 @@ export class RolesService {
     role.deletedAt = new Date();
     role.isActive = false;
     await this.roleRepository.save(role);
+
+    this.messagingService.logAudit({
+      action: 'DELETE_ROLE',
+      userId: deletedBy,
+      resource: 'role',
+      resourceId: id,
+      status: 'SUCCESS',
+      metadata: { code: role.code, name: role.name },
+    });
 
     return { message: 'Rôle supprimé avec succès' };
   }
@@ -269,6 +296,7 @@ export class RolesService {
     roleId: string,
     permissionId: string,
     constraints?: Record<string, any>,
+    grantedBy?: string,
   ) {
     const role = await this.findOne(roleId);
 
@@ -302,17 +330,27 @@ export class RolesService {
       await this.rolePermissionRepository.save(rolePermission);
     }
 
+    this.messagingService.logAudit({
+      action: 'GRANT_ROLE_PERMISSION',
+      userId: grantedBy,
+      resource: 'role',
+      resourceId: roleId,
+      status: 'SUCCESS',
+      metadata: { permissionId, permissionCode: permission.code },
+    });
+
     return this.findOne(roleId);
   }
 
   /**
    * Retirer une permission d'un rôle
    */
-  async removePermission(roleId: string, permissionId: string) {
+  async removePermission(roleId: string, permissionId: string, revokedBy?: string) {
     const role = await this.findOne(roleId);
 
     const rolePermission = await this.rolePermissionRepository.findOne({
       where: { roleId, permissionId },
+      relations: ['permission'],
     });
 
     if (!rolePermission) {
@@ -320,6 +358,15 @@ export class RolesService {
     }
 
     await this.rolePermissionRepository.delete({ roleId, permissionId });
+
+    this.messagingService.logAudit({
+      action: 'REVOKE_ROLE_PERMISSION',
+      userId: revokedBy,
+      resource: 'role',
+      resourceId: roleId,
+      status: 'SUCCESS',
+      metadata: { permissionId, permissionCode: rolePermission.permission?.code },
+    });
 
     return this.findOne(roleId);
   }

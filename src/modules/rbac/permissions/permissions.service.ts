@@ -11,6 +11,7 @@ import { RolePermission } from '@database/entities/role-permission.entity';
 import { CreatePermissionDto } from './dto/create-permission.dto';
 import { UpdatePermissionDto } from './dto/update-permission.dto';
 import { QueryPermissionsDto } from './dto/query-permissions.dto';
+import { MessagingService } from '../messaging-module/messaging.service';
 
 @Injectable()
 export class PermissionsService {
@@ -19,12 +20,13 @@ export class PermissionsService {
     private permissionRepository: Repository<Permission>,
     @InjectRepository(RolePermission)
     private rolePermissionRepository: Repository<RolePermission>,
+    private messagingService: MessagingService,
   ) {}
 
   /**
    * Créer une nouvelle permission
    */
-  async create(createPermissionDto: CreatePermissionDto , createBy: string) {
+  async create(createPermissionDto: CreatePermissionDto, createBy: string) {
     // Vérifier si le code existe déjà
     const existingPermission = await this.permissionRepository.findOne({
       where: { code: createPermissionDto.code },
@@ -36,7 +38,18 @@ export class PermissionsService {
 
     const permission = this.permissionRepository.create(createPermissionDto);
     permission.createdBy = createBy;
-    return this.permissionRepository.save(permission );
+    const saved = await this.permissionRepository.save(permission);
+
+    this.messagingService.logAudit({
+      action: 'CREATE_PERMISSION',
+      userId: createBy,
+      resource: 'permission',
+      resourceId: saved.id,
+      status: 'SUCCESS',
+      metadata: { code: saved.code, resourceType: saved.resourceType, action: saved.action },
+    });
+
+    return saved;
   }
 
   /**
@@ -136,7 +149,7 @@ export class PermissionsService {
   /**
    * Mettre à jour une permission
    */
-  async update(id: string, updatePermissionDto: UpdatePermissionDto) {
+  async update(id: string, updatePermissionDto: UpdatePermissionDto, updatedBy?: string) {
     const permission = await this.permissionRepository.findOne({ where: { id } });
 
     if (!permission) {
@@ -144,13 +157,24 @@ export class PermissionsService {
     }
 
     Object.assign(permission, updatePermissionDto);
-    return this.permissionRepository.save(permission);
+    const saved = await this.permissionRepository.save(permission);
+
+    this.messagingService.logAudit({
+      action: 'UPDATE_PERMISSION',
+      userId: updatedBy,
+      resource: 'permission',
+      resourceId: id,
+      status: 'SUCCESS',
+      metadata: { code: saved.code, changes: updatePermissionDto },
+    });
+
+    return saved;
   }
 
   /**
    * Supprimer une permission
    */
-  async remove(id: string) {
+  async remove(id: string, deletedBy?: string) {
     const permission = await this.permissionRepository.findOne({ where: { id } });
 
     if (!permission) {
@@ -169,6 +193,15 @@ export class PermissionsService {
     }
     permission.deletedAt = new Date();
     await this.permissionRepository.save(permission);
+
+    this.messagingService.logAudit({
+      action: 'DELETE_PERMISSION',
+      userId: deletedBy,
+      resource: 'permission',
+      resourceId: id,
+      status: 'SUCCESS',
+      metadata: { code: permission.code, resourceType: permission.resourceType },
+    });
 
     return { message: 'Permission supprimée avec succès' };
   }

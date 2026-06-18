@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { RolesModule } from './modules/rbac/roles/roles.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -11,10 +11,8 @@ import { PermissionsModule } from './modules/rbac/permissions/permissions.module
 import { AssignmentsModule } from './modules/rbac/assignments/assignments.module';
 import { PermissionOverridesModule } from './modules/rbac/permission-overrides/permission-overrides.module';
 import { RbacGrpcServer } from './grpc/rbac-grpc.server';
-//  a integre apres
-// import { JwtGatewayGuard } from 'medical_platform_shared';
-
-
+import { MessagingModule } from './modules/rbac/messaging-module/messaging.module';
+import { MessagingService } from './modules/rbac/messaging-module/messaging.service';
 
 @Module({
   imports: [
@@ -30,6 +28,9 @@ import { RbacGrpcServer } from './grpc/rbac-grpc.server';
         getDatabaseConfig(configService),
     }),
 
+    // Messaging (Kafka global)
+    MessagingModule.forService('rbac-service'),
+
     // redis
     RedisModule.forRootAsync({
       inject: [ConfigService],
@@ -38,7 +39,6 @@ import { RbacGrpcServer } from './grpc/rbac-grpc.server';
         return { ...config, type: 'single' as const };
       },
     }),
-    
     
     RolesModule,
     PermissionsModule,
@@ -54,4 +54,26 @@ import { RbacGrpcServer } from './grpc/rbac-grpc.server';
     RbacGrpcServer
   ]
 })
-export class AppModule {}
+export class AppModule implements OnApplicationBootstrap, OnApplicationShutdown {
+  constructor(private readonly messagingService: MessagingService) {}
+
+  onApplicationBootstrap() {
+    this.messagingService.logTechnical({
+      action: 'application.start',
+      status: 'SUCCESS',
+      metadata: {
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  onApplicationShutdown() {
+    this.messagingService.logTechnical({
+      action: 'application.shutdown',
+      status: 'SUCCESS',
+      metadata: {
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+}

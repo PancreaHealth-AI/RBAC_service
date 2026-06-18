@@ -12,6 +12,8 @@ import { Permission } from '@database/entities/permission.entity';
 import { CreatePermissionOverrideDto } from './dto/create-override.dto';
 import { UpdatePermissionOverrideDto } from './dto/update-override.dto';
 import { QueryOverridesDto } from './dto/query-overrides.dto';
+import { MessagingService } from '../messaging-module/messaging.service';
+import { NotificationChannel } from '../messaging-module/enums/notification-channel.enum';
 
 @Injectable()
 export class PermissionOverridesService {
@@ -22,6 +24,7 @@ export class PermissionOverridesService {
     private roleAssignmentRepository: Repository<RoleAssignment>,
     @InjectRepository(Permission)
     private permissionRepository: Repository<Permission>,
+    private messagingService: MessagingService,
   ) {}
 
   /**
@@ -75,6 +78,52 @@ export class PermissionOverridesService {
     });
 
     const savedOverride = await this.overrideRepository.save(override);
+
+    this.messagingService.logSecurity({
+      action: 'GRANT_OVERRIDE',
+      userId: approvedBy,
+      resource: 'permission_override',
+      resourceId: savedOverride.id,
+      status: 'SUCCESS',
+      metadata: {
+        targetUserId: roleAssignment.userId,
+        permissionId,
+        permissionCode: permission.code,
+        overrideType,
+        roleId: roleAssignment.roleId,
+        roleName: roleAssignment.role?.name,
+      },
+    });
+
+    if (overrideType === OverrideType.GRANT) {
+      this.messagingService.notify(
+        {
+          userId: roleAssignment.userId,
+          assignedRoleId: roleAssignment.id,
+          type: 'OVERRIDE_PERMISSION_GRANTED',
+          channel: NotificationChannel.WEBSOCKET,
+          title: 'Permission spéciale accordée',
+          content: `Une permission supplémentaire vous a été accordée : ${permission.code}.`,
+          variables: { permissionId, permissionCode: permission.code, approvedBy },
+        },
+        this.messagingService.topics.userEvents,
+      );
+    }else{
+      if(overrideType === OverrideType.REVOKE){
+        this.messagingService.notify(
+          {
+            userId: roleAssignment.userId,
+            assignedRoleId: roleAssignment.id,
+            type: 'OVERRIDE_PERMISSION_REVOKED',
+            channel: NotificationChannel.WEBSOCKET,
+            title: 'Permission spéciale révoquée',
+            content: `Une permission spéciale vous a été retirée : ${permission.code}.`,
+            variables: { permissionId, permissionCode: permission.code, approvedBy },
+          },
+          this.messagingService.topics.userEvents,
+        );
+      }
+    }
 
     return this.findOne(savedOverride.id);
   }
@@ -203,7 +252,7 @@ export class PermissionOverridesService {
   /**
    * Mettre à jour une surcharge
    */
-  async update(id: string, updateOverrideDto: UpdatePermissionOverrideDto) {
+  async update(id: string, updateOverrideDto: UpdatePermissionOverrideDto, updatedBy?: string) {
     const override = await this.overrideRepository.findOne({ where: { id } });
 
     if (!override) {
@@ -226,20 +275,58 @@ export class PermissionOverridesService {
 
     await this.overrideRepository.save(override);
 
+    this.messagingService.logAudit({
+      action: 'UPDATE_OVERRIDE',
+      userId: updatedBy,
+      resource: 'permission_override',
+      resourceId: id,
+      status: 'SUCCESS',
+      metadata: { changes: updateOverrideDto },
+    });
+
     return this.findOne(id);
   }
 
   /**
    * Supprimer une surcharge
    */
-  async remove(id: string) {
-    const override = await this.overrideRepository.findOne({ where: { id } });
+  async remove(id: string, deletedBy?: string) {
+    const override = await this.overrideRepository.findOne({
+      where: { id },
+      relations: ['permission', 'roleAssignment'],
+    });
 
     if (!override) {
       throw new NotFoundException('Surcharge de permission non trouvée');
     }
 
+    const { roleAssignment, permission } = override;
+
     await this.overrideRepository.remove(override);
+
+    this.messagingService.logAudit({
+      action: 'DELETE_OVERRIDE',
+      userId: deletedBy,
+      resource: 'permission_override',
+      resourceId: id,
+      status: 'SUCCESS',
+      metadata: { permissionCode: permission?.code, targetUserId: roleAssignment?.userId },
+    });
+
+    if(override.overrideType === OverrideType.GRANT){
+      this.messagingService.notify(
+        {
+          userId: roleAssignment.userId,
+          assignedRoleId: roleAssignment.id,
+          type: 'OVERRIDE_PERMISSION_REVOKED',
+          channel: NotificationChannel.WEBSOCKET,
+          title: 'Permission spéciale révoquée',
+          content: `Une permission spéciale vous a été retirée : ${permission.code}.`,
+          variables: { permissionId:permission.id, permissionCode: permission.code, approvedBy:deletedBy },
+        },
+        this.messagingService.topics.userEvents,
+      );
+    }
 
     return { message: 'Surcharge supprimée avec succès' };
   }
@@ -247,12 +334,17 @@ export class PermissionOverridesService {
   /**
    * Révoquer une surcharge (marquer comme expirée)
    */
-  async revoke(id: string, reason?: string) {
-    const override = await this.overrideRepository.findOne({ where: { id } });
+  async revoke(id: string, reason?: string, revokedBy?: string) {
+    const override = await this.overrideRepository.findOne({
+      where: { id },
+      relations: ['permission', 'roleAssignment'],
+    });
 
     if (!override) {
       throw new NotFoundException('Surcharge de permission non trouvée');
     }
+
+    const { roleAssignment, permission, overrideType } = override;
 
     // Marquer comme expirée immédiatement
     override.expiresAt = new Date();
@@ -261,6 +353,30 @@ export class PermissionOverridesService {
     }
 
     await this.overrideRepository.save(override);
+
+    this.messagingService.logSecurity({
+      action: 'REVOKE_OVERRIDE',
+      userId: revokedBy,
+      resource: 'permission_override',
+      resourceId: id,
+      status: 'SUCCESS',
+      metadata: { permissionCode: permission?.code, targetUserId: roleAssignment?.userId, overrideType, reason },
+    });
+
+    if (overrideType === OverrideType.GRANT) {
+      this.messagingService.notify(
+        {
+          userId: roleAssignment?.userId,
+          assignedRoleId: roleAssignment?.id,
+          type: 'OVERRIDE_PERMISSION_REVOKED',
+          channel: NotificationChannel.WEBSOCKET,
+          title: 'Permission spéciale révoquée',
+          content: `Une permission spéciale vous a été retirée : ${permission?.code}.`,
+          variables: { permissionCode: permission?.code, revokedBy, reason },
+        },
+        this.messagingService.topics.userEvents,
+      );
+    }
 
     return { message: 'Surcharge révoquée avec succès' };
   }
@@ -343,12 +459,20 @@ export class PermissionOverridesService {
   /**
    * Nettoyer les surcharges expirées
    */
-  async cleanExpiredOverrides() {
+  async cleanExpiredOverrides(cleanedBy?: string) {
     const result = await this.overrideRepository
       .createQueryBuilder()
       .delete()
       .where('expiresAt < :now', { now: new Date() })
       .execute();
+
+    this.messagingService.logAudit({
+      action: 'CLEANUP_OVERRIDES',
+      userId: cleanedBy,
+      resource: 'permission_override',
+      status: 'SUCCESS',
+      metadata: { deletedCount: result.affected || 0 },
+    });
 
     return {
       message: `${result.affected || 0} surcharges expirées supprimées`,

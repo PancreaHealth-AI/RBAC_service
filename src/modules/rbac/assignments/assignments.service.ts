@@ -18,6 +18,8 @@ import { GrantTemporaryPermissionDto } from './dto/temporary-permission.dto';
 import { UpdateRoleAssignmentDto } from './dto/update-role-assignment.dto';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
+import { MessagingService } from '../messaging-module/messaging.service';
+import { NotificationChannel } from '../messaging-module/enums/notification-channel.enum';
 
 @Injectable()
 export class AssignmentsService {
@@ -33,6 +35,7 @@ export class AssignmentsService {
     @InjectRepository(RolePermission)
     private rolePermissionRepository: Repository<RolePermission>,
     @InjectRedis() private readonly redis: Redis,
+    private messagingService: MessagingService,
   ) {}
 
   /**
@@ -75,22 +78,72 @@ export class AssignmentsService {
       expiresAt: expiresAt ? new Date(expiresAt) : undefined,
     });
 
-    return this.roleAssignmentRepository.save(assignment);
+    const saved = await this.roleAssignmentRepository.save(assignment);
+
+    this.messagingService.logAudit({
+      action: 'ASSIGN_ROLE',
+      userId: assignedBy,
+      resource: 'role_assignment',
+      resourceId: saved.id,
+      status: 'SUCCESS',
+      metadata: { targetUserId: userId, roleId, roleName: role.name, scopeType, scopeId },
+    });
+
+    this.messagingService.notify(
+      {
+        userId,
+        type: 'ROLE_GRANTED',
+        channel: NotificationChannel.EMAIL,
+        title: 'Rôle attribué',
+        content: `Un nouveau rôle vous a été attribué : ${role.name}.`,
+
+        variables: { roleId, roleName: role.name, assignmentId: saved.id, assignedBy },
+      },
+      this.messagingService.topics.userEvents,
+    );
+
+    return saved;
   }
 
  /**
  * Retirer un rôle d'un utilisateur (suppression physique)
  */
-  async removeRole(assignmentId: string) {
+  async removeRole(assignmentId: string, removedBy?: string) {
     const assignment = await this.roleAssignmentRepository.findOne({
       where: { id: assignmentId },
+      relations: ['role'],
     });
 
     if (!assignment) {
       throw new NotFoundException('Attribution de rôle non trouvée');
     }
 
+    const { userId, roleId } = assignment;
+    const roleName = assignment.role?.name;
+
     await this.roleAssignmentRepository.delete({ id: assignment.id });
+
+    this.messagingService.logAudit({
+      action: 'REMOVE_ROLE',
+      userId: removedBy,
+      resource: 'role_assignment',
+      resourceId: assignmentId,
+      status: 'SUCCESS',
+      metadata: { targetUserId: userId, roleId, roleName },
+    });
+
+    this.messagingService.notify(
+      {
+        userId,
+        type: 'ROLE_REVOKED',
+        channel: NotificationChannel.EMAIL,
+        title: 'Rôle révoqué',
+        content: `Un de vos rôles a été retiré : ${roleName ?? roleId}.`,
+        variables: { roleId, roleName, assignmentId, removedBy },
+      },
+      this.messagingService.topics.userEvents,
+    );
+
     return { message: 'Attribution de rôle supprimée avec succès' };
   }
   /**
@@ -99,6 +152,7 @@ export class AssignmentsService {
   async updateAssignment(
     assignmentId: string,
     updateDto: UpdateRoleAssignmentDto,
+    updatedBy?: string,
   ) {
     const assignment = await this.roleAssignmentRepository.findOne({
       where: { id: assignmentId },
@@ -122,6 +176,16 @@ export class AssignmentsService {
     }
 
     await this.roleAssignmentRepository.save(assignment);
+
+    this.messagingService.logAudit({
+      action: 'UPDATE_ASSIGNMENT',
+      userId: updatedBy,
+      resource: 'role_assignment',
+      resourceId: assignmentId,
+      status: 'SUCCESS',
+      metadata: { changes: updateDto },
+    });
+
     return assignment;
   }
 
@@ -346,7 +410,7 @@ export class AssignmentsService {
   /**
  * Récupère les codes de permission effectifs pour une attribution de rôle donnée (assignmentId)
  */
-async getPermissionCodesForAssignment(userId: string, assignmentId: string): Promise<string[]> {
+  async getPermissionCodesForAssignment(userId: string, assignmentId: string): Promise<string[]> {
     // Vérifier que l'attribution appartient bien à l'utilisateur
     const assignment = await this.roleAssignmentRepository.findOne({
       where: { id: assignmentId, userId, isActive: true },
@@ -357,7 +421,7 @@ async getPermissionCodesForAssignment(userId: string, assignmentId: string): Pro
     const cacheKey = `user:${userId}:assignment:${assignmentId}:permcodes`;
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
-    console.log(`Cache miss for ${cacheKey}, fetching from DB...`);
+
     // Permissions de base du rôle (isGranted = true)
     const rolePerms = await this.rolePermissionRepository.find({
       where: { roleId: assignment.roleId, isGranted: true },
@@ -393,7 +457,6 @@ async getPermissionCodesForAssignment(userId: string, assignmentId: string): Pro
    */
   async checkPermissionForAssignment(userId: string, assignmentId: string, permissionCode: string): Promise<boolean> {
     const perms = await this.getPermissionCodesForAssignment(userId, assignmentId);
-    console.log(`Permissions for user ${userId} and assignment ${assignmentId}:`, perms);
     return perms.includes(permissionCode);
   }
 
@@ -471,7 +534,32 @@ async getPermissionCodesForAssignment(userId: string, assignmentId: string): Pro
       expiresAt: overrideDto.expiresAt ? new Date(overrideDto.expiresAt) : undefined,
     });
 
-    return this.permissionOverrideRepository.save(override);
+    const savedOverride = await this.permissionOverrideRepository.save(override);
+
+    this.messagingService.logSecurity({
+      action: 'GRANT_OVERRIDE',
+      userId: approvedBy,
+      resource: 'permission_override',
+      resourceId: savedOverride.id,
+      status: 'SUCCESS',
+      metadata: { targetUserId: userId, permissionId: overrideDto.permissionId, permissionCode: permission.code, overrideType: overrideDto.overrideType },
+    });
+
+    if (overrideDto.overrideType === OverrideType.GRANT) {
+      this.messagingService.notify(
+        {
+          userId,
+          type: 'OVERRIDE_PERMISSION_GRANTED',
+          channel: NotificationChannel.WEBSOCKET,
+          title: 'Permission spéciale accordée',
+          content: `Une permission supplémentaire vous a été accordée : ${permission.code}.`,
+          variables: { permissionId: permission.id, permissionCode: permission.code, approvedBy },
+        },
+        this.messagingService.topics.userEvents,
+      );
+    }
+
+    return savedOverride;
   }
 
   /**

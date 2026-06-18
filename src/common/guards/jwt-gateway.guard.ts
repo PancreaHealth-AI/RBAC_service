@@ -18,7 +18,7 @@ export class JwtGatewayGuard implements CanActivate {
     private configService: ConfigService,
     @InjectRedis()
     private readonly redis: Redis,
-) {
+  ) {
     const keyPath = this.configService.get<string>('JWT_PUBLIC_KEY_PATH');
     if (!keyPath) {
       throw new Error('JWT_PUBLIC_KEY_PATH is not defined in configuration');

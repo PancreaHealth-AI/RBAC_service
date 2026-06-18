@@ -3,6 +3,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import { AssignmentsService } from '../modules/rbac/assignments/assignments.service';
 import { ConfigService } from '@nestjs/config';
+import { MessagingService } from '../modules/rbac/messaging-module/messaging.service';
 import * as fs from 'fs';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class RbacGrpcServer implements OnModuleInit {
   constructor(
     private assignmentsService: AssignmentsService,
     private configService: ConfigService,
+    private messagingService: MessagingService,
   ) {
     this.port = this.configService.get<number>('GRPC_PORT', 3003);
   }
@@ -79,10 +81,31 @@ export class RbacGrpcServer implements OnModuleInit {
             permission_code,
           );
       }
-      console.log(`cote server grpc : User ${user_id} has permission ${permission_code}:`, hasPermission);
+
+      this.messagingService.logSecurity({
+        action: hasPermission ? 'GRPC_PERMISSION_GRANTED' : 'GRPC_PERMISSION_DENIED',
+        userId: user_id,
+        resource: 'permission',
+        resourceId: permission_code,
+        status: 'SUCCESS',
+        metadata: { assignmentId: assignment_id, hasPermission },
+      });
+
+      this.logger.log(
+        `[gRPC] CheckPermission: user=${user_id} perm=${permission_code} result=${hasPermission}`,
+      );
       callback(null, { has_permission: hasPermission });
     } catch (err) {
-      this.logger.error(err);
+      this.messagingService.logTechnical({
+        action: 'GRPC_HANDLER_ERROR',
+        userId: user_id,
+        resource: 'grpc.checkPermission',
+        status: 'FAILED',
+        metadata: { permissionCode: permission_code, error: err?.message },
+      });
+      this.logger.error(
+        `[gRPC] CheckPermission error: user=${user_id} perm=${permission_code} error=${err?.message}`,
+      );
       callback(err, null);
     }
   }
@@ -92,7 +115,6 @@ export class RbacGrpcServer implements OnModuleInit {
     try {
       const roles = await this.assignmentsService.getUserRoles(user_id);
       const mapped = roles.map((r) => {
-      
 
         return {
           assignment_id: r.id,
@@ -107,10 +129,30 @@ export class RbacGrpcServer implements OnModuleInit {
           // service_id: r.serviceId ?? null,
         };
       });
-      console.log(`cote server grpc : User ${user_id} has roles:`, mapped);
+
+      this.messagingService.logAudit({
+        action: 'GRPC_GET_USER_ROLES',
+        userId: user_id,
+        resource: 'role',
+        status: 'SUCCESS',
+        metadata: { rolesCount: mapped.length },
+      });
+
+      this.logger.log(
+        `[gRPC] GetUserRoles: user=${user_id} roles=${mapped.length}`,
+      );
       callback(null, { roles: mapped });
     } catch (err) {
-      this.logger.error(err);
+      this.messagingService.logTechnical({
+        action: 'GRPC_HANDLER_ERROR',
+        userId: user_id,
+        resource: 'grpc.getUserRoles',
+        status: 'FAILED',
+        metadata: { error: err?.message },
+      });
+      this.logger.error(
+        `[gRPC] GetUserRoles error: user=${user_id} error=${err?.message}`,
+      );
       callback(err, null);
     }
   }
