@@ -19,22 +19,23 @@ import { CreatePermissionDto } from './dto/create-permission.dto';
 import { UpdatePermissionDto } from './dto/update-permission.dto';
 import { QueryPermissionsDto } from './dto/query-permissions.dto';
 import { PermissionResponseDto } from './dto/permission-response.dto';
-// import { JwtAuthGuard } from '../../../common/guards/jwt-gateway.guard';
-// import { RolesGuard } from '../../common/guards/roles.guard';
-// import { Roles } from '../../common/decorators/roles.decorator';
+import { JwtGatewayGuard } from '../../../common/guards/jwt-gateway.guard';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
 import { ResourceType } from '@database/entities/permission.entity';
+import { Permission } from '../../../common/decorators/permission.decorator';
 
 @ApiTags('RBAC - Permissions')
 @Controller('rbac/permissions')
-// @UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(PermissionGuard)
 @ApiBearerAuth()
 export class PermissionsController {
-  constructor(private readonly permissionsService: PermissionsService) {}
+  constructor(private readonly permissionsService: PermissionsService) { }
 
   /**
    * Créer une nouvelle permission
    */
   @Post()
+  @Permission('permission.create')
   // @Roles('SUPER_ADMIN')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Créer une nouvelle permission' })
@@ -53,6 +54,7 @@ export class PermissionsController {
    * Lister toutes les permissions système
    */
   @Get()
+  @Permission('permission.read')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Lister toutes les permissions système' })
   @ApiResponse({
@@ -68,6 +70,7 @@ export class PermissionsController {
    * Obtenir une permission par ID
    */
   @Get(':id')
+  @Permission('permission.read')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Obtenir une permission par ID' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
@@ -84,6 +87,7 @@ export class PermissionsController {
    * Mettre à jour une permission
    */
   @Put(':id')
+  @Permission('permission.update')
   // @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Mettre à jour une permission' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
@@ -103,6 +107,7 @@ export class PermissionsController {
    * Supprimer une permission
    */
   @Delete(':id')
+  @Permission('permission.delete')
   // @Roles('SUPER_ADMIN')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer une permission' })
@@ -120,6 +125,7 @@ export class PermissionsController {
    * Initialiser les permissions système (seed)
    */
   @Post('seed')
+  @Permission('permission.create')
   // @Roles('SUPER_ADMIN')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Initialiser les permissions système (seed)' })
@@ -132,6 +138,7 @@ export class PermissionsController {
    * Récupérer les permissions par ressource
    */
   @Get('resource/:resourceType')
+  @Permission('permission.read')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Récupérer permissions par type de ressource' })
   @ApiParam({ name: 'resourceType', enum: ResourceType })
@@ -144,6 +151,7 @@ export class PermissionsController {
    * Grouper les permissions par ressource
    */
   @Get('grouped/by-resource')
+  @Permission('permission.read')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Grouper permissions par ressource' })
   @ApiResponse({ status: 200, description: 'Permissions groupées' })
@@ -152,9 +160,21 @@ export class PermissionsController {
   }
 
   /**
+   * Obtenir tous les endpoints sécurisés par @Permission groupés par contrôleur
+   */
+  @Get('by-controller')
+  @Permission('permission.read')
+  @ApiOperation({ summary: 'Obtenir tous les endpoints sécurisés par @Permission groupés par contrôleur' })
+  @ApiResponse({ status: 200, description: 'Liste des endpoints sécurisés par contrôleur' })
+  async getEndpointsByController() {
+    return this.permissionsService.getEndpointsByController();
+  }
+
+  /**
    * Récupérer toutes les permissions d'un rôle
    */
   @Get('role/:roleId')
+  @Permission('permission.read')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Récupérer toutes les permissions d\'un rôle' })
   @ApiParam({ name: 'roleId', type: 'string', format: 'uuid' })

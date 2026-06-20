@@ -34,10 +34,13 @@ import { UpdateRoleAssignmentDto } from './dto/update-role-assignment.dto';
 // import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 // import { RolesGuard } from '../../common/guards/roles.guard';
 // import { Roles } from '../../common/decorators/roles.decorator';
+import { Permission } from '../../../common/decorators/permission.decorator';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { JwtGatewayGuard } from '../../../common/guards/jwt-gateway.guard';
 
 @ApiTags('RBAC - Assignments & Permissions')
 @Controller('rbac')
-// @UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(PermissionGuard)
 @ApiBearerAuth()
 export class AssignmentsController {
   constructor(private readonly assignmentsService: AssignmentsService) {}
@@ -46,6 +49,7 @@ export class AssignmentsController {
    * Assigner un rôle à un utilisateur
    */
   @Post('users/:userId/roles')
+  @Permission('assignment.create')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Assigner un rôle à un utilisateur' })
@@ -63,6 +67,7 @@ export class AssignmentsController {
    * Retirer un rôle d'un utilisateur
    */
   @Delete('users/:assignmentId/roles')
+  @Permission('assignment.delete')
   @ApiOperation({ summary: 'Retirer un rôle d\'un utilisateur' })
   @ApiParam({ name: 'assignmentId', type: 'string', format: 'uuid', description: 'ID de l\'attribution de rôle' })
   @ApiResponse({ status: 200, description: 'Rôle retiré' })
@@ -74,6 +79,7 @@ export class AssignmentsController {
    * update une attribution de rôle (expiration, active, scope)
    */
   @Patch('users/:assignmentId/roles')
+  @Permission('assignment.update')
   @ApiOperation({ summary: 'Mettre à jour une attribution de rôle (expiration, active, scope)' })
   @ApiParam({ name: 'assignmentId', type: String })
   @ApiBody({ type: UpdateRoleAssignmentDto })
@@ -87,6 +93,7 @@ export class AssignmentsController {
    * Récupérer tous les rôles d'un utilisateur
    */
   @Get('users/:userId/roles')
+  @Permission('assignment.read')
   @ApiOperation({ summary: 'Récupérer tous les rôles d’un utilisateur' })
   @ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Liste des rôles attribués' })
@@ -95,6 +102,7 @@ export class AssignmentsController {
   }
 
    @Get('me/roles')
+    // @Permission('assignment.read')
     @ApiOperation({ summary: 'Récupérer les rôles de l’utilisateur connecté' })
     async getMyRoles(@Request() req,) {
       if (!req.user) {
@@ -108,6 +116,7 @@ export class AssignmentsController {
    * Récupérer les permissions effectives d'un utilisateur
    */
   @Get('users/:userId/effective-permissions')
+  @Permission('assignment.read')
   @ApiOperation({ summary: 'Récupérer permissions effectives d\'un utilisateur' })
   @ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
   @ApiResponse({
@@ -135,6 +144,7 @@ export class AssignmentsController {
    * Récupérer les codes de permission effectifs pour une attribution donnée
    */
   @Get(':assignmentId/permissions/codes')
+  @Permission('assignment.read')
   @ApiOperation({ summary: 'Codes de permission effectifs pour un rôle attribué' })
   @ApiParam({ name: 'assignmentId', type: 'string', format: 'uuid' })
   async getPermissionCodes(
@@ -150,6 +160,7 @@ export class AssignmentsController {
    * Récupérer les permissions effectives pour un utlisateur connecté
    */
   @Get('me/effective-permissions')
+  // @Permission('assignment.read')
   @ApiOperation({ summary: 'Récupérer les permissions effectives pour un utilisateur connecté' })
   async getMyEffectivePermissions(@Request() req) {
     const userId = req.user?.sub;
@@ -162,6 +173,7 @@ export class AssignmentsController {
    * Vérifier si une permission est accordée pour cette attribution
    */
   @Get(':assignmentId/check-permission')
+  // @Permission('assignment.read')
   @ApiOperation({ summary: 'Vérifier une permission pour cette attribution' })
   @ApiParam({ name: 'assignmentId', type: 'string', format: 'uuid' })
   @ApiQuery({ name: 'code', type: 'string' })
@@ -191,6 +203,7 @@ export class AssignmentsController {
    * Ajouter/Modifier permissions personnalisées pour un rôle d'utilisateur
    */
   @Patch('users/:userId/roles/:roleId/permissions')
+  @Permission('override.create')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Surcharger permissions d\'un rôle pour un utilisateur' })
   @ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
@@ -214,6 +227,7 @@ export class AssignmentsController {
    * Accorder une permission temporaire
    */
   @Post('users/:userId/temporary-permissions')
+  @Permission('override.create')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Accorder permission temporaire à un utilisateur' })
@@ -235,6 +249,7 @@ export class AssignmentsController {
    * Lister toutes les surcharges actives d'un utilisateur
    */
   @Get('users/:userId/permission-overrides')
+  @Permission('override.read')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Lister surcharges de permissions d\'un utilisateur' })
   @ApiParam({ name: 'userId', type: 'string', format: 'uuid' })

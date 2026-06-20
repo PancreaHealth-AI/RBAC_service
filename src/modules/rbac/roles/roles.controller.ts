@@ -15,7 +15,7 @@ import {
   HttpCode,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
-import type { Request } from 'express'; 
+import type { Request } from 'express';
 
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
@@ -25,25 +25,28 @@ import { RoleResponseDto } from './dto/role-response.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { AddPermissionsDto } from './dto/add-permissions.dto';
 import { RemovePermissionsDto } from './dto/remove-permissions.dto';
+import { Permission } from '../../../common/decorators/permission.decorator';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
 
 @ApiTags('RBAC - Roles')
 @Controller('rbac/roles')
 @ApiBearerAuth()
-// @UseGuards(JwtGatewayGuard) // ✅ IMPORTANT
+@UseGuards(PermissionGuard)
 export class RolesController {
-  constructor(private readonly rolesService: RolesService) {}
+  constructor(private readonly rolesService: RolesService) { }
 
   @Post()
+  @Permission('role.create')
   async create(
     @Body() createRoleDto: CreateRoleDto,
     @Req() req: Request,
   ) {
-    
+
     if (!req.user) {
       throw new UnauthorizedException('User not found');
     }
 
-    const userId = req.user.sub; 
+    const userId = req.user.sub;
     return this.rolesService.create(createRoleDto, userId);
   }
   // @Post()
@@ -73,24 +76,25 @@ export class RolesController {
   //   // ...
   //   return this.rolesService.create(createRoleDto, userId);
   // }
-// @Post()
-// async create(@Body() createRoleDto: CreateRoleDto, @Request() req: Request) {
-//   console.log("req headers:", req.headers);
-//   const userId = req.headers['x-user-id']; // ← correction ici
-//   console.log("User ID from headers:", userId);
+  // @Post()
+  // async create(@Body() createRoleDto: CreateRoleDto, @Request() req: Request) {
+  //   console.log("req headers:", req.headers);
+  //   const userId = req.headers['x-user-id']; // ← correction ici
+  //   console.log("User ID from headers:", userId);
 
-//   if (!userId) {
-//     throw new UnauthorizedException('User not identified');
-//   }
+  //   if (!userId) {
+  //     throw new UnauthorizedException('User not identified');
+  //   }
 
-//   return this.rolesService.create(createRoleDto, userId);
-// }
+  //   return this.rolesService.create(createRoleDto, userId);
+  // }
 
   /**
    * Lister tous les rôles
    */
   @Get()
-//   @Roles('ADMIN', 'SUPER_ADMIN')
+  @Permission('role.read')
+  //   @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Lister tous les rôles avec filtres' })
   @ApiResponse({ status: 200, description: 'Liste des rôles' })
   async findAll(@Query() queryDto: QueryRolesDto) {
@@ -101,7 +105,8 @@ export class RolesController {
    * Obtenir un rôle par ID
    */
   @Get(':id')
-//   @Roles('ADMIN', 'SUPER_ADMIN')
+  @Permission('role.read')
+  //   @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Obtenir un rôle par ID avec ses permissions' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Rôle trouvé', type: RoleResponseDto })
@@ -114,7 +119,8 @@ export class RolesController {
    * Mettre à jour un rôle
    */
   @Put(':id')
-//   @Roles('ADMIN', 'SUPER_ADMIN')
+  @Permission('role.update')
+  //   @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Mettre à jour un rôle' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Rôle mis à jour', type: RoleResponseDto })
@@ -130,7 +136,8 @@ export class RolesController {
    * Supprimer un rôle
    */
   @Delete(':id')
-//   @Roles('SUPER_ADMIN')
+  @Permission('role.delete')
+  //   @Roles('SUPER_ADMIN')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un rôle (soft delete)' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
@@ -144,7 +151,8 @@ export class RolesController {
    * Ajouter une permission à un rôle
    */
   @Post(':id/permissions/:permissionId')
-//   @Roles('ADMIN', 'SUPER_ADMIN')
+  @Permission('role.update')
+  //   @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Ajouter une permission à un rôle' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiParam({ name: 'permissionId', type: 'string', format: 'uuid' })
@@ -161,7 +169,8 @@ export class RolesController {
    * Retirer une permission d'un rôle
    */
   @Delete(':id/permissions/:permissionId')
-//   @Roles('ADMIN', 'SUPER_ADMIN')
+  @Permission('role.update')
+  //   @Roles('ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Retirer une permission d\'un rôle' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
@@ -178,6 +187,7 @@ export class RolesController {
    * Ajouter plusieurs permissions à un rôle
    */
   @Post(':id/permissions')
+  @Permission('role.update')
   @ApiOperation({ summary: 'Ajouter plusieurs permissions à un rôle' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiBody({ type: AddPermissionsDto })
@@ -197,6 +207,7 @@ export class RolesController {
    * Retirer plusieurs permissions d'un rôle
    */
   @Delete(':id/permissions')
+  @Permission('role.update')
   @ApiOperation({ summary: 'Retirer plusieurs permissions d\'un rôle' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiBody({ type: RemovePermissionsDto })
@@ -212,6 +223,7 @@ export class RolesController {
    * Cloner un rôle
    */
   @Post(':id/clone')
+  @Permission('role.create')
   @ApiOperation({ summary: 'Cloner un rôle existant vers un nouveau rôle' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiBody({

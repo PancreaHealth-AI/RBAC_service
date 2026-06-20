@@ -28,10 +28,13 @@ import { PermissionOverrideResponseDto } from './dto/override-response.dto';
 // import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 // import { RolesGuard } from '../../common/guards/roles.guard';
 // import { Roles } from '../../common/decorators/roles.decorator';
+import { Permission } from '../../../common/decorators/permission.decorator';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { JwtGatewayGuard } from '../../../common/guards/jwt-gateway.guard';
 
 @ApiTags('RBAC - Permission Overrides')
 @Controller('rbac/permission-overrides')
-// @UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(PermissionGuard)
 @ApiBearerAuth()
 export class PermissionOverridesController {
   constructor(
@@ -42,6 +45,7 @@ export class PermissionOverridesController {
    * Créer une surcharge de permission
    */
   @Post()
+  @Permission('override.create')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Créer une surcharge de permission' })
@@ -62,6 +66,7 @@ export class PermissionOverridesController {
    * Lister toutes les surcharges
    */
   @Get()
+  @Permission('override.read')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Lister toutes les surcharges avec filtres' })
   @ApiResponse({
@@ -77,6 +82,7 @@ export class PermissionOverridesController {
    * Obtenir une surcharge par ID
    */
   @Get(':id')
+  @Permission('override.read')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Obtenir une surcharge par ID' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
@@ -93,6 +99,7 @@ export class PermissionOverridesController {
    * Mettre à jour une surcharge
    */
   @Put(':id')
+  @Permission('override.update')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Mettre à jour une surcharge' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
@@ -112,6 +119,7 @@ export class PermissionOverridesController {
    * Supprimer une surcharge
    */
   @Delete(':id')
+  @Permission('override.delete')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer une surcharge' })
@@ -125,6 +133,7 @@ export class PermissionOverridesController {
    * Révoquer une surcharge
    */
   @Post(':id/revoke')
+  @Permission('override.update')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Révoquer une surcharge (marquer comme expirée)' })
@@ -141,6 +150,7 @@ export class PermissionOverridesController {
    * Récupérer toutes les surcharges d'un utilisateur
    */
   @Get('user/:userId')
+  @Permission('override.read')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Récupérer toutes les surcharges d\'un utilisateur' })
   @ApiParam({ name: 'userId', type: 'string', format: 'uuid' })
@@ -156,6 +166,7 @@ export class PermissionOverridesController {
    *    * Récupérer toutes les surcharges d'une affectation de rôle
    */
   @Get('assignment/:assignmentId')
+  @Permission('override.read')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Récupérer toutes les surcharges d\'une affectation de rôle' })
   @ApiParam({ name: 'assignmentId', type: 'string', format: 'uuid' })
@@ -172,6 +183,7 @@ export class PermissionOverridesController {
    * Récupérer toutes les surcharges pour une permission
    */
   @Get('permission/:permissionId')
+  @Permission('override.read')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Récupérer surcharges pour une permission' })
   @ApiParam({ name: 'permissionId', type: 'string', format: 'uuid' })
@@ -184,6 +196,7 @@ export class PermissionOverridesController {
    * Nettoyer les surcharges expirées
    */
   @Post('cleanup/expired')
+  @Permission('override.delete')
   // @Roles('SUPER_ADMIN')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Nettoyer les surcharges expirées' })
@@ -196,6 +209,7 @@ export class PermissionOverridesController {
    * Statistiques des surcharges
    */
   @Get('stats/summary')
+  @Permission('override.read')
   // @Roles('ADMIN', 'SUPER_ADMIN')
   @ApiOperation({ summary: 'Statistiques des surcharges' })
   @ApiResponse({ status: 200, description: 'Statistiques' })

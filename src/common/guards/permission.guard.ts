@@ -5,16 +5,16 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { RbacGrpcClient } from 'medical_platform_shared';
 import { Redis } from 'ioredis';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import { MessagingService } from '../../modules/rbac/messaging-module/messaging.service';
+import { AssignmentsService } from '../../modules/rbac/assignments/assignments.service';
 
 @Injectable()
 export class PermissionGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
-    private rbacClient: RbacGrpcClient,
+    private assignmentsService: AssignmentsService,
     @InjectRedis() private readonly redis: Redis,
     private readonly messagingService: MessagingService,
   ) {}
@@ -66,14 +66,29 @@ export class PermissionGuard implements CanActivate {
 
     const cacheKey = `perm:${user.sub}:${assignmentId}:${permissionCode}`;
 
-    // 1. Cache Redis
-    const cached = await this.redis.get(cacheKey);
-    console.log(`Cache check for key Auth service ${cacheKey}: ${cached}`);
+    // 1. Cache Redis avec tolérance aux pannes
+    let cached: string | null = null;
+    try {
+      cached = await this.redis.get(cacheKey);
+      console.log(`Cache check for key dme service ${cacheKey}: ${cached}`);
+    } catch (err) {
+      this.messagingService.logTechnical({
+        action: 'REDIS_QUERY_FAILURE',
+        status: 'FAILED',
+        metadata: {
+          error: err.message,
+          operation: 'get',
+          key: cacheKey,
+        },
+      });
+    }
+
     if (cached !== null) {
       const allowed = cached === 'true';
+      console.log(`Permission ${permissionCode} for user ${user.sub} with assignment ${assignmentId}: ${allowed}`);
       if (!allowed) {
         this.messagingService.logSecurity({
-          action: 'auth.permission_denied',
+          action: 'INSUFFICIENT_PERMISSIONS',
           userId: user.sub,
           resource: 'permission',
           target: permissionCode,
@@ -90,19 +105,32 @@ export class PermissionGuard implements CanActivate {
       return allowed;
     }
 
-    // 2. Appel gRPC RBAC
-    const hasPermission = await this.rbacClient.checkPermission(
+    // 2. Appel local service
+    const hasPermission = await this.assignmentsService.checkPermissionForAssignment(
       user.sub,
-      permissionCode,
       assignmentId,
+      permissionCode,
     );
 
-    // 3. Stocker en cache 15 minutes
-    await this.redis.set(cacheKey, hasPermission ? 'true' : 'false', 'EX', 900);
+    // 3. Stocker en cache 15 minutes avec tolérance aux pannes
+    try {
+      await this.redis.set(cacheKey, hasPermission ? 'true' : 'false', 'EX', 900);
+    } catch (err) {
+      this.messagingService.logTechnical({
+        action: 'REDIS_QUERY_FAILURE',
+        status: 'FAILED',
+        metadata: {
+          error: err.message,
+          operation: 'set',
+          key: cacheKey,
+        },
+      });
+    }
 
     if (!hasPermission) {
+      console.log("Permission denied for user", user.sub, "with permission", permissionCode);
       this.messagingService.logSecurity({
-        action: 'auth.permission_denied',
+        action: 'INSUFFICIENT_PERMISSIONS',
         userId: user.sub,
         resource: 'permission',
         target: permissionCode,

@@ -6,9 +6,12 @@ import { PermissionOverride } from '@database/entities/permission-override.entit
 import { RoleAssignment } from '@database/entities/role-assignment.entity';
 import { Permission } from '@database/entities/permission.entity';
 
+import { AssignmentsModule } from '../assignments/assignments.module';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([PermissionOverride, RoleAssignment, Permission]),
+    AssignmentsModule,
   ],
   controllers: [PermissionOverridesController],
   providers: [PermissionOverridesService],
