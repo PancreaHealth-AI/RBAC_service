@@ -50,8 +50,8 @@ async function bootstrap() {
 
   console.log(`
     🚀 Authentication Service is running!
-    📝 API: http://localhost:3002/api/v1
-    📚 Swagger: http://localhost:3002/api/docs
+    📝 API: http://klodit.app:3002/api/v1
+    📚 Swagger: http://klodit.app:3002/api/docs
   `);
 }
 bootstrap();

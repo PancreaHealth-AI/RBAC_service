@@ -13,7 +13,7 @@ si Kafka est indisponible.
    ```
 3. Variables d'environnement (`.env`) :
    ```env
-   KAFKA_BROKERS=localhost:9092
+   KAFKA_BROKERS=kafka:29092
    KAFKA_CLIENT_ID=rbac-service-producer
    NOTIFICATION_TOPIC=notifications.events
    # optionnels :
