@@ -35,10 +35,11 @@ async function bootstrap() {
     .setDescription('API pour l\'ABAC ')
     .setVersion('1.0')
     .addBearerAuth()
+    .addServer('/api/v1/rbac')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('api/docs/rbac', app, document);
 
   // 👉 Endpoint JSON pour l'API Gateway
   app.use('/api-json', (req, res) => {
@@ -46,7 +47,8 @@ async function bootstrap() {
   });
 
 
-  await app.listen(3002);
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
 
   console.log(`
     🚀 Authentication Service is running!
